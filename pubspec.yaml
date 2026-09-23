@@ -1,0 +1,31 @@
+name: study_architect
+description: "Study Architect — local-first Flutter study planner and tracker."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.2.1
+  sqflite: ^2.3.3
+  sqflite_common_ffi: ^2.4.3
+  path: ^1.9.0
+  uuid: ^4.4.0
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
+  file_picker: ^13.1.0
+  share_plus: ^13.3.0
+  path_provider: ^2.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
