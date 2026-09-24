@@ -1,19 +1,35 @@
 import 'package:flutter/material.dart';
+
 import 'package:uuid/uuid.dart';
+
 import '../../models/subject.dart';
+
 import '../../models/topic.dart';
+
 import '../../models/study_session.dart';
+
 import '../../repositories/subject_repository.dart';
+
 import '../../repositories/topic_repository.dart';
+
 import '../../repositories/session_repository.dart';
+
 import '../../theme/app_theme.dart';
+
 import '../../theme/theme_helpers.dart';
+
 import '../../utils/date_utils.dart';
+
 import '../../widgets/gradient_background.dart';
+
 import '../../widgets/app_buttons.dart';
+
 import '../../widgets/async_builder.dart';
+
 import '../../widgets/topic_row.dart';
+
 import '../session/focus_timer_screen.dart';
+
 import 'add_edit_subject_screen.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
@@ -102,34 +118,46 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   Future<void> _addTopic(BuildContext context) async {
     final controller = TextEditingController();
 
+    TransitionRoute<dynamic>? dialogRoute;
+
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New topic'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'e.g. Differential Equations',
+      builder: (dialogContext) {
+        dialogRoute = ModalRoute.of(dialogContext);
+
+        return AlertDialog(
+          title: const Text('New topic'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'e.g. Differential Equations',
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(
-                context,
-                controller.text.trim(),
-              );
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  controller.text.trim(),
+                );
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
     );
+
+    // Wait until the dialog route has completely finished
+    // its exit transition and has been removed from the overlay.
+    if (dialogRoute != null) {
+      await dialogRoute!.completed;
+    }
 
     controller.dispose();
 
@@ -295,8 +323,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                     child: RefreshIndicator(
                       onRefresh: _refresh,
                       child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        physics:
+                            const AlwaysScrollableScrollPhysics(),
+                        padding:
+                            const EdgeInsets.all(AppSpacing.lg),
                         children: [
                           Container(
                             padding:
@@ -304,7 +334,9 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                             decoration: BoxDecoration(
                               color: context.cardSurface,
                               borderRadius:
-                                  BorderRadius.circular(AppRadii.card),
+                                  BorderRadius.circular(
+                                AppRadii.card,
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment:
@@ -340,7 +372,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                                     Text(
                                       '$percent%',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight:
+                                            FontWeight.w600,
                                         color: Color(
                                           subject.colorValue,
                                         ),

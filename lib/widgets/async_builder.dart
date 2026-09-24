@@ -42,7 +42,15 @@ class AsyncBuilder<T> extends StatelessWidget {
           stateKey = 'loading';
         } else {
           child = builder(context, snapshot.data as T);
-          stateKey = 'data-${identityHashCode(snapshot.data)}';
+          // Was: 'data-${identityHashCode(snapshot.data)}'
+          // That changed on every reload (new object every _load() call),
+          // forcing AnimatedSwitcher to tear down and rebuild the whole
+          // subtree — including IconButton tooltips/overlays — on every
+          // single reload. That teardown-mid-rebuild is what triggered
+          // the `_dependents.isEmpty` crash. A stable key here means we
+          // only fade between loading/error/data states, not on every
+          // refresh within the "data" state.
+          stateKey = 'data';
         }
 
         return AnimatedSwitcher(
