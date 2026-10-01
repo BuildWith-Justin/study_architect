@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// The three pastel hues used across Home tasks, class cards, and
-/// Timetable events. Keeping this as an enum means every widget that
-/// needs "pick a pastel" pulls from the same three options.
+/// The three tinted hues used across Home tasks, class cards, and
+/// Timetable events.
 enum PastelHue { blue, purple, green }
 
 Color pastelBackground(PastelHue hue) {
@@ -28,9 +27,9 @@ Color pastelStrong(PastelHue hue) {
   }
 }
 
-/// Generic pastel container — the base every task/class/event card
-/// builds on top of. Handles the rounded pastel background; callers
-/// supply the content.
+/// Generic tinted container: the base every task/class/event card builds
+/// on. Light mode: soft pastel. Dark mode: the strong hue at low opacity
+/// over the navy background, so light text stays readable.
 class PastelCard extends StatelessWidget {
   final PastelHue hue;
   final Widget child;
@@ -47,11 +46,16 @@ class PastelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
+    final bg = isDark
+        ? pastelStrong(hue).withValues(alpha: 0.18)
+        : pastelBackground(hue);
+
     final card = Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: pastelBackground(hue),
+        color: bg,
         borderRadius: BorderRadius.circular(AppRadii.cardSmall),
       ),
       child: child,

@@ -7,6 +7,11 @@ import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../utils/date_utils.dart';
 import '../../widgets/async_builder.dart';
+import '../../features/auth/auth_service.dart';
+import '../../features/auth/password_prompt_card.dart';
+import '../../features/auth/set_password_screen.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import '../../features/auth/auth_diagnostics_screen.dart';
 import '../progress/progress_screen.dart';
 import 'backup_screen.dart';
 import 'edit_goals_screen.dart';
@@ -135,6 +140,45 @@ class _MoreScreenState extends State<MoreScreen>
     }
   }
 
+  /// Asks for confirmation, then signs out through Supabase.
+  /// AuthGate listens to the auth stream and switches to the Sign In
+  /// screen by itself, so no manual navigation is needed here.
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'You will need to sign in again to use your account on this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text(
+              'Sign out',
+              style: TextStyle(color: Color(0xFFD64545)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await AuthService.instance.signOut();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AuthService.friendlyError(e))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AsyncBuilder<MoreViewData>(
@@ -147,17 +191,31 @@ class _MoreScreenState extends State<MoreScreen>
         final notificationsEnabled =
             _notificationOverride ?? data.settings.notificationsEnabled;
 
+        // Only show the Sign out card when Supabase is running and
+        // someone is actually signed in.
+        final authUser =
+            AuthService.isAvailable ? AuthService.instance.currentUser : null;
+
         return RefreshIndicator(
           onRefresh: _reload,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg + MediaQuery.of(context).padding.bottom + 96,
+            ),
             children: [
               Text(
                 'More',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: AppSpacing.lg),
+
+              
+
+              const PasswordPromptCard(),
 
               _SectionCard(
                 onTap: () async {
@@ -350,6 +408,75 @@ class _MoreScreenState extends State<MoreScreen>
               ),
 
               const SizedBox(height: AppSpacing.md),
+
+              // ---- V2: set or change password ----
+              if (authUser != null) ...[
+                _SectionCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SetPasswordScreen(),
+                    ),
+                  ),
+                  child: _rowLabelValue('Password', 'Set or change'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              // ---- V2: debug-only auth diagnostics ----
+              if (kDebugMode) ...[
+                _SectionCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AuthDiagnosticsScreen(),
+                    ),
+                  ),
+                  child: _rowLabelValue('Auth diagnostics', 'Debug only'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              // ---- V2: Account / Sign out ----
+              if (authUser != null) ...[
+                _SectionCard(
+                  onTap: _confirmSignOut,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.logout_rounded,
+                        color: Color(0xFFD64545),
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Sign out',
+                              style: TextStyle(
+                                color: Color(0xFFD64545),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if ((authUser.email ?? '').isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                authUser.email!,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
 
               _SectionCard(
                 onTap: () {

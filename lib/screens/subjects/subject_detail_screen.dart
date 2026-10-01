@@ -1,35 +1,21 @@
 import 'package:flutter/material.dart';
-
 import 'package:uuid/uuid.dart';
 
+import '../../core/refreshable_screen.dart'; // <- use the real filename, see note below
 import '../../models/subject.dart';
-
 import '../../models/topic.dart';
-
 import '../../models/study_session.dart';
-
 import '../../repositories/subject_repository.dart';
-
 import '../../repositories/topic_repository.dart';
-
 import '../../repositories/session_repository.dart';
-
 import '../../theme/app_theme.dart';
-
 import '../../theme/theme_helpers.dart';
-
 import '../../utils/date_utils.dart';
-
 import '../../widgets/gradient_background.dart';
-
 import '../../widgets/app_buttons.dart';
-
 import '../../widgets/async_builder.dart';
-
 import '../../widgets/topic_row.dart';
-
 import '../session/focus_timer_screen.dart';
-
 import 'add_edit_subject_screen.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
@@ -45,7 +31,7 @@ class SubjectDetailScreen extends StatefulWidget {
 }
 
 class _SubjectDetailScreenState extends State<SubjectDetailScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, RefreshableScreenMixin {
   final _subjectRepo = SubjectRepository();
   final _topicRepo = TopicRepository();
   final _sessionRepo = SessionRepository();
@@ -114,6 +100,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       // AsyncBuilder will display the error state.
     }
   }
+
+  /// Called by RefreshableScreenMixin when sync brings in cloud changes.
+  @override
+  Future<void> onRefresh() => _refresh();
 
   Future<void> _addTopic(BuildContext context) async {
     final controller = TextEditingController();

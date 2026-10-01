@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../features/auth/auth_gate.dart';
 import '../theme/light_theme.dart';
 import '../theme/dark_theme.dart';
 import 'routes.dart';
@@ -23,6 +24,26 @@ class _StudyArchitectAppState extends State<StudyArchitectApp> {
     ThemeController.instance.loadFromSettings();
   }
 
+  /// V2: wraps the existing root route in AuthGate.
+  /// - Signed in (or Supabase unavailable) -> the original root screen,
+  ///   exactly what V1 showed.
+  /// - Signed out -> Sign In screen.
+  /// Every other route in AppRoutes.table is left untouched.
+  Map<String, WidgetBuilder> _buildRoutes() {
+    final originalRoot = AppRoutes.table[AppRoutes.root];
+
+    if (originalRoot == null) {
+      return AppRoutes.table;
+    }
+
+    return {
+      ...AppRoutes.table,
+      AppRoutes.root: (context) => AuthGate(
+            signedInBuilder: (gateContext) => originalRoot(gateContext),
+          ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
@@ -35,7 +56,7 @@ class _StudyArchitectAppState extends State<StudyArchitectApp> {
           darkTheme: buildDarkTheme(),
           themeMode: themeMode,
           initialRoute: AppRoutes.root,
-          routes: AppRoutes.table,
+          routes: _buildRoutes(),
           navigatorObservers: [routeObserver],
         );
       },

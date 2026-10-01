@@ -1,6 +1,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'sync_schema.dart';
+
 /// Owns the single sqflite Database instance and schema. Screens never
 /// touch this directly — they go through the repositories in
 /// lib/repositories/, which call DatabaseService.instance.database.
@@ -9,7 +11,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'study_architect.db';
-  static const _dbVersion = 1;
+  static const _dbVersion = 2;
 
   Database? _db;
 
@@ -24,7 +26,13 @@ class DatabaseService {
     return openDatabase(
       path,
       version: _dbVersion,
-      onCreate: _createSchema,
+      onCreate: (db, version) async {
+        await _createSchema(db, version);
+        await applySyncSchema(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await applySyncSchema(db);
+      },
       // sqflite does not enforce foreign keys by default — turn them on
       // so the ON DELETE CASCADE / SET NULL rules above actually run.
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),

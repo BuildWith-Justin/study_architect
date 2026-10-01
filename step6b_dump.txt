@@ -1,0 +1,777 @@
+===== FILE: lib\widgets\progress_card.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+/// The "Today's progress" bar card on Home: value / target, a
+/// progress bar, and a short encouragement line.
+class ProgressCard extends StatelessWidget {
+  final String label; // e.g. "Today's progress"
+  final String current; // e.g. "5h 12m"
+  final String target; // e.g. "8h"
+  final double percent; // 0.0 - 1.0
+  final String note; // e.g. "Keep going"
+
+  const ProgressCard({
+    super.key,
+    required this.label,
+    required this.current,
+    required this.target,
+    required this.percent,
+    required this.note,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                current,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '/ $target',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: percent.clamp(0.0, 1.0),
+              minHeight: 8,
+              backgroundColor: isDark
+                  ? AppColors.surfaceDarkAlt
+                  : AppColors.backgroundGradientTop,
+              valueColor: const AlwaysStoppedAnimation(
+                AppColors.accentPurpleStrong,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            note,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+===== FILE: lib\widgets\stat_card.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+/// Small metric tile used on Home (Subjects, Tasks today, Streak,
+/// Weekly goal) and reusable anywhere a single number needs a label.
+class StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData? icon;
+  final Color? accent;
+  /// Set true only for a card that's actually tappable (e.g. Weekly
+  /// goal opening Progress) — adds a small chevron so the card looks
+  /// interactive instead of being visually identical to the other,
+  /// non-tappable stat cards next to it.
+  final bool showsTapAffordance;
+
+  const StatCard({
+    super.key,
+    required this.label,
+    required this.value,
+    this.icon,
+    this.accent,
+    this.showsTapAffordance = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+              if (showsTapAffordance) ...[
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.chevron_right,
+                  size: 14,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: accent ?? AppColors.accentPurpleStrong),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                value,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+===== FILE: lib\widgets\class_card.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+import 'pastel_card.dart';
+
+/// The hero "Now" card on Home showing the current/next class,
+/// with a Join button (used while a session is live).
+class ClassCard extends StatelessWidget {
+  final String timeRange; // e.g. "8:40 - 10:15"
+  final String title; // e.g. "Mathematical analysis"
+  final PastelHue hue;
+  final String actionLabel; // e.g. "Join the lesson" or "Start session"
+  final VoidCallback? onAction;
+
+  const ClassCard({
+    super.key,
+    required this.timeRange,
+    required this.title,
+    required this.actionLabel,
+    this.hue = PastelHue.blue,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PastelCard(
+      hue: hue,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            timeRange,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF5A5F73)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: onAction,
+            icon: const Icon(Icons.videocam_rounded, size: 16),
+            label: Text(actionLabel),
+          ),
+        ],
+      ),
+    );
+  }
+}
+===== FILE: lib\widgets\task_card.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+import 'pastel_card.dart';
+
+/// A single task tile, e.g. Home's "Computer networks / Laboratory
+/// work N1 / 3 days left" card.
+class TaskCard extends StatelessWidget {
+  final String subject;
+  final String title;
+  final String meta; // e.g. "3 days left" or "Until 09.18"
+  final PastelHue hue;
+  final bool completed;
+  final VoidCallback? onTap;
+
+  const TaskCard({
+    super.key,
+    required this.subject,
+    required this.title,
+    required this.meta,
+    required this.hue,
+    this.completed = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final strong = pastelStrong(hue);
+    return PastelCard(
+      hue: hue,
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            subject,
+            style: TextStyle(
+              fontSize: 11,
+              color: strong.withOpacity(0.85),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+              decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                completed ? Icons.check_circle_rounded : Icons.schedule_rounded,
+                size: 13,
+                color: strong,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                meta,
+                style: TextStyle(fontSize: 11, color: strong.withOpacity(0.85)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+===== FILE: lib\widgets\pastel_card.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+/// The three tinted hues used across Home tasks, class cards, and
+/// Timetable events.
+enum PastelHue { blue, purple, green }
+
+Color pastelBackground(PastelHue hue) {
+  switch (hue) {
+    case PastelHue.blue:
+      return AppColors.accentBlue;
+    case PastelHue.purple:
+      return AppColors.accentPurple;
+    case PastelHue.green:
+      return AppColors.accentGreen;
+  }
+}
+
+Color pastelStrong(PastelHue hue) {
+  switch (hue) {
+    case PastelHue.blue:
+      return AppColors.accentBlueStrong;
+    case PastelHue.purple:
+      return AppColors.accentPurpleStrong;
+    case PastelHue.green:
+      return AppColors.accentGreenStrong;
+  }
+}
+
+/// Generic tinted container: the base every task/class/event card builds
+/// on. Light mode: soft pastel. Dark mode: the strong hue at low opacity
+/// over the navy background, so light text stays readable.
+class PastelCard extends StatelessWidget {
+  final PastelHue hue;
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+
+  const PastelCard({
+    super.key,
+    required this.hue,
+    required this.child,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
+    final bg = isDark
+        ? pastelStrong(hue).withValues(alpha: 0.18)
+        : pastelBackground(hue);
+
+    final card = Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadii.cardSmall),
+      ),
+      child: child,
+    );
+
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.cardSmall),
+        onTap: onTap,
+        child: card,
+      ),
+    );
+  }
+}
+===== FILE: lib\widgets\schedule_row.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+/// A single row in Home's "Today's schedule" list — a colored left
+/// bar plus subject/topic and time range. Simpler than Timetable's
+/// dot-and-line timeline by design: Home just needs a glanceable list.
+class ScheduleRow extends StatelessWidget {
+  final String title; // e.g. "Mathematics, Calculus"
+  final String timeRange; // e.g. "8:00 - 10:00"
+  final Color accent;
+  final VoidCallback? onTap;
+
+  const ScheduleRow({
+    super.key,
+    required this.title,
+    required this.timeRange,
+    required this.accent,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.cardSmall),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(AppRadii.cardSmall),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      timeRange,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+===== FILE: lib\widgets\gradient_background.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+/// Wraps a screen's content in the soft diagonal pastel gradient used
+/// on every screen. Switches to the dedicated dark gradient in dark mode.
+class GradientBackground extends StatelessWidget {
+  final Widget child;
+
+  const GradientBackground({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final top = isDark
+        ? AppColors.darkBackgroundGradientTop
+        : AppColors.backgroundGradientTop;
+    final bottom = isDark
+        ? AppColors.darkBackgroundGradientBottom
+        : AppColors.backgroundGradientBottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [top, bottom],
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+===== FILE: lib\utils\date_utils.dart =====
+/// Small date helpers shared by Home, Timetable, and Progress —
+/// keeps "start of day" / "start of week" logic in one place.
+DateTime startOfDay(DateTime date) => DateTime(date.year, date.month, date.day);
+
+/// Monday-start week, matching the spec's "Week • September 8–14" style.
+DateTime startOfWeek(DateTime date) {
+  final day = startOfDay(date);
+  return day.subtract(Duration(days: day.weekday - DateTime.monday));
+}
+
+DateTime endOfWeek(DateTime date) => startOfWeek(date).add(const Duration(days: 7));
+
+bool isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+String formatDuration(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '${m}m';
+  if (m == 0) return '${h}h';
+  return '${h}h ${m}m';
+}
+
+String formatTimeOfDay(DateTime time) {
+  final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+  final minute = time.minute.toString().padLeft(2, '0');
+  final period = time.hour >= 12 ? 'PM' : 'AM';
+  return '$hour:$minute $period';
+}
+===== FILE: lib\utils\study_stats.dart =====
+import '../models/study_session.dart';
+import 'date_utils.dart';
+
+/// Sum of actualDuration (minutes) across completed sessions whose
+/// scheduledDate falls on [date].
+int completedMinutesForDate(List<StudySession> sessions, DateTime date) {
+  return sessions
+      .where((s) => s.complete && isSameDay(s.scheduledDate, date))
+      .fold(0, (sum, s) => sum + (s.actualDuration ?? 0));
+}
+
+/// Sum of actualDuration across completed sessions within [sessions],
+/// with no date filtering — pass in a week's worth of sessions to get
+/// a weekly total.
+int completedMinutesTotal(List<StudySession> sessions) {
+  return sessions
+      .where((s) => s.complete)
+      .fold(0, (sum, s) => sum + (s.actualDuration ?? 0));
+}
+
+/// Current study streak, per the V1 business rule: a day counts only
+/// if it has at least one completed session.
+///
+/// [completedDates] are yyyy-MM-dd strings from
+/// SessionRepository.getCompletedDates(). Today not yet having a
+/// completed session does not break the streak — it simply isn't
+/// counted yet, since the day isn't over.
+int currentStreak(Set<String> completedDates, {DateTime? today}) {
+  final now = today ?? DateTime.now();
+  var cursor = startOfDay(now);
+  var streak = 0;
+
+  bool hasSessionOn(DateTime day) =>
+      completedDates.contains(_dateKey(day));
+
+  // If today already has a completed session, count it and step back
+  // from yesterday. If not, today is skipped (not yet failed) and we
+  // start checking from yesterday.
+  if (hasSessionOn(cursor)) {
+    streak++;
+  }
+  cursor = cursor.subtract(const Duration(days: 1));
+
+  while (hasSessionOn(cursor)) {
+    streak++;
+    cursor = cursor.subtract(const Duration(days: 1));
+  }
+
+  return streak;
+}
+
+String _dateKey(DateTime date) {
+  final y = date.year.toString().padLeft(4, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  final d = date.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
+}
+
+/// Longest run of consecutive completed-session days on record, e.g.
+/// for the "Longest: 18 days" line on the Progress screen.
+int longestStreak(Set<String> completedDates) {
+  if (completedDates.isEmpty) return 0;
+
+  final sortedDates = completedDates.map((key) {
+    final parts = key.split('-');
+    return DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+  }).toList()
+    ..sort();
+
+  var longest = 1;
+  var current = 1;
+  for (var i = 1; i < sortedDates.length; i++) {
+    final gap = sortedDates[i].difference(sortedDates[i - 1]).inDays;
+    if (gap == 1) {
+      current++;
+      longest = current > longest ? current : longest;
+    } else if (gap > 1) {
+      current = 1;
+    }
+  }
+  return longest;
+}
+===== FILE: lib\app\route_observer.dart =====
+import 'package:flutter/material.dart';
+
+final RouteObserver<ModalRoute<dynamic>> routeObserver =
+    RouteObserver<ModalRoute<dynamic>>();
+===== FILE: lib\app\routes.dart =====
+import 'package:flutter/material.dart';
+import 'startup_decider.dart';
+import '../screens/plan/plan_session_screen.dart';
+
+class AppRoutes {
+  AppRoutes._();
+
+  static const root = '/';
+  static const plan = '/plan';
+
+  static Map<String, WidgetBuilder> get table => {
+        root: (_) => const StartupDecider(),
+        plan: (_) => const PlanSessionScreen(),
+      };
+}
+===== FILE: lib\models\task.dart =====
+enum TaskType { assignment, reading, revision, project, other }
+
+TaskType taskTypeFromString(String value) {
+  return TaskType.values.firstWhere(
+    (t) => t.name == value,
+    orElse: () => TaskType.other,
+  );
+}
+
+class Task {
+  final String id;
+  final String title;
+  final String subjectId;
+  final String? topicId;
+  final DateTime dueDate;
+  final TaskType type;
+  final String notes;
+  final bool completed;
+  final DateTime createdAt;
+
+  const Task({
+    required this.id,
+    required this.title,
+    required this.subjectId,
+    this.topicId,
+    required this.dueDate,
+    this.type = TaskType.other,
+    this.notes = '',
+    this.completed = false,
+    required this.createdAt,
+  });
+
+  Task copyWith({
+    String? id,
+    String? title,
+    String? subjectId,
+    String? topicId,
+    DateTime? dueDate,
+    TaskType? type,
+    String? notes,
+    bool? completed,
+    DateTime? createdAt,
+  }) {
+    return Task(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subjectId: subjectId ?? this.subjectId,
+      topicId: topicId ?? this.topicId,
+      dueDate: dueDate ?? this.dueDate,
+      type: type ?? this.type,
+      notes: notes ?? this.notes,
+      completed: completed ?? this.completed,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'subjectId': subjectId,
+        'topicId': topicId,
+        'dueDate': dueDate.toIso8601String(),
+        'type': type.name,
+        'notes': notes,
+        'completed': completed ? 1 : 0,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory Task.fromMap(Map<String, dynamic> map) => Task(
+        id: map['id'] as String,
+        title: map['title'] as String,
+        subjectId: map['subjectId'] as String,
+        topicId: map['topicId'] as String?,
+        dueDate: DateTime.parse(map['dueDate'] as String),
+        type: taskTypeFromString(map['type'] as String),
+        notes: map['notes'] as String? ?? '',
+        completed: (map['completed'] as int) == 1,
+        createdAt: DateTime.parse(map['createdAt'] as String),
+      );
+}
+===== FILE: lib\repositories\task_repository.dart =====
+import '../models/task.dart';
+import '../services/database_service.dart';
+
+class TaskRepository {
+  final _db = DatabaseService.instance;
+
+  Future<void> create(Task task) async {
+    final db = await _db.database;
+    await db.insert('tasks', task.toMap());
+  }
+
+  Future<void> update(Task task) async {
+    final db = await _db.database;
+    await db.update('tasks', task.toMap(), where: 'id = ?', whereArgs: [task.id]);
+  }
+
+  Future<void> delete(String id) async {
+    final db = await _db.database;
+    await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> setCompleted(String id, bool completed) async {
+    final db = await _db.database;
+    await db.update(
+      'tasks',
+      {'completed': completed ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Task>> getForDate(DateTime date) async {
+    final db = await _db.database;
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final rows = await db.query(
+      'tasks',
+      where: 'dueDate >= ? AND dueDate < ?',
+      whereArgs: [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
+      orderBy: 'dueDate ASC',
+    );
+    return rows.map(Task.fromMap).toList();
+  }
+
+  Future<List<Task>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('tasks', orderBy: 'dueDate ASC');
+    return rows.map(Task.fromMap).toList();
+  }
+
+  Future<List<Task>> getForSubject(String subjectId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'tasks',
+      where: 'subjectId = ?',
+      whereArgs: [subjectId],
+      orderBy: 'dueDate ASC',
+    );
+    return rows.map(Task.fromMap).toList();
+  }
+}

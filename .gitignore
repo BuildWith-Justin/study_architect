@@ -50,3 +50,5 @@ app.*.map.json
 android/build/
 
 .env 
+
+*.bak

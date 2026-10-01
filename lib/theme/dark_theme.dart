@@ -13,7 +13,7 @@ ThemeData buildDarkTheme() {
     scaffoldBackgroundColor: AppColors.darkBackgroundGradientTop,
     textTheme: textTheme,
     colorScheme: base.colorScheme.copyWith(
-      primary: AppColors.accentPurpleStrong,
+      primary: AppColors.primary,
       secondary: AppColors.accentBlueStrong,
       surface: AppColors.surfaceDark,
     ),

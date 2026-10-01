@@ -5,7 +5,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app/app.dart';
+import 'features/auth/auth_service.dart';
 import 'services/notification_service.dart';
+import 'services/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,8 +31,15 @@ void main() async {
       url: dotenv.env['SUPABASE_URL']!,
       publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
     );
+    // Only flips to true when init fully succeeded. AuthGate reads this
+    // so it never touches Supabase.instance when the client isn't ready.
+    AuthService.isAvailable = true;
     debugPrint('Supabase initialized OK');
+
+    // V2 Step 4: start local <-> cloud sync (does nothing until signed in).
+    SyncService.instance.start();
   } catch (e) {
+    AuthService.isAvailable = false;
     debugPrint('Supabase init failed: $e');
   }
 

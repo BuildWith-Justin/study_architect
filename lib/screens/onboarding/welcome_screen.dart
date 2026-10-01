@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_buttons.dart';
+import '../../widgets/app_logo.dart';
 
 class WelcomeScreen extends StatelessWidget {
   final VoidCallback onGetStarted;
@@ -14,49 +15,55 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final secondary = AppColors.secondaryText(context);
+
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const Center(child: AppLogo(size: 72)),
+          const SizedBox(height: AppSpacing.lg),
           Text(
-            'STUDY ARCHITECT',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  letterSpacing: 2,
-                  color: AppColors.textSecondary,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Plan your study life.',
+            'Study Architect',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Study with intention. Track your progress.',
+            'Plan  ·  Study  ·  Achieve',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
+                  color: secondary,
+                  letterSpacing: 1,
                 ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          Row(
+          Text(
+            'Your personal study companion\nfor a better tomorrow.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: secondary,
+                  height: 1.4,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _PillLabel(label: 'PLAN', hue: AppColors.accentPurpleStrong),
-              const SizedBox(width: AppSpacing.sm),
+              SizedBox(width: AppSpacing.sm),
               _PillLabel(label: 'STUDY', hue: AppColors.accentBlueStrong),
-              const SizedBox(width: AppSpacing.sm),
-              _PillLabel(label: 'TRACK', hue: AppColors.accentGreenStrong),
+              SizedBox(width: AppSpacing.sm),
+              _PillLabel(label: 'ACHIEVE', hue: AppColors.accentGreenStrong),
             ],
           ),
           const SizedBox(height: AppSpacing.xl * 2),
           PrimaryButton(label: 'Get Started', onPressed: onGetStarted),
+          const SizedBox(height: AppSpacing.sm),
           SecondaryButton(
             label: 'I already have my data',
             onPressed: onImportExisting,
@@ -78,7 +85,7 @@ class _PillLabel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: hue.withOpacity(0.15),
+        color: hue.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

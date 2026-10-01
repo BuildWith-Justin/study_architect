@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/refreshable_screen.dart'; // <- use the real filename, see note below
 import '../../theme/app_theme.dart';
 import '../../widgets/subject_card.dart';
 import '../../widgets/pastel_card.dart';
@@ -14,7 +15,7 @@ class SubjectsScreen extends StatefulWidget {
 }
 
 class _SubjectsScreenState extends State<SubjectsScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, RefreshableScreenMixin {
   late Future<List<SubjectSummary>> _future;
 
   @override
@@ -52,6 +53,10 @@ class _SubjectsScreenState extends State<SubjectsScreen>
       // The FutureBuilder displays the error state.
     }
   }
+
+  /// Called by RefreshableScreenMixin when sync brings in cloud changes.
+  @override
+  Future<void> onRefresh() => _reload();
 
   PastelHue _hueFor(int colorValue) {
     if (colorValue == AppColors.accentGreenStrong.toARGB32()) {

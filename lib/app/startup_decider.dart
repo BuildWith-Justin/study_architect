@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../features/auth/auth_service.dart';
 import '../repositories/student_repository.dart';
 import '../screens/onboarding/onboarding_flow.dart';
+import '../services/sync_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_background.dart';
+import '../widgets/splash_view.dart';
 import '../widgets/main_scaffold.dart';
 
 /// The app's actual root widget.
@@ -11,6 +15,10 @@ import '../widgets/main_scaffold.dart';
 /// Checks whether a Student profile already exists in local storage.
 /// If no profile exists, onboarding is shown.
 /// If a profile exists, the main tab shell is shown.
+///
+/// V2: if the local database is empty but the user is signed in, the
+/// profile may already be in the cloud (new phone, reinstall), so one
+/// sync is attempted before deciding.
 class StartupDecider extends StatefulWidget {
   const StartupDecider({super.key});
 
@@ -30,6 +38,10 @@ class _StartupDeciderState extends State<StartupDecider> {
     _checkOnboardingStatus();
   }
 
+  bool get _signedIn =>
+      AuthService.isAvailable &&
+      Supabase.instance.client.auth.currentUser != null;
+
   Future<void> _checkOnboardingStatus() async {
     if (!mounted) return;
 
@@ -39,7 +51,18 @@ class _StartupDeciderState extends State<StartupDecider> {
     });
 
     try {
-      final student = await _studentRepository.getCurrent();
+      var student = await _studentRepository.getCurrent();
+
+      if (student == null && _signedIn) {
+        try {
+          await SyncService.instance
+              .syncNow()
+              .timeout(const Duration(seconds: 8));
+        } catch (e) {
+          debugPrint('StartupDecider pre-onboarding sync skipped: $e');
+        }
+        student = await _studentRepository.getCurrent();
+      }
 
       if (!mounted) return;
 
@@ -111,11 +134,7 @@ class _StartupDeciderState extends State<StartupDecider> {
     }
 
     if (_onboardingComplete == null) {
-      return const GradientBackground(
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const SplashView();
     }
 
     if (_onboardingComplete == false) {
