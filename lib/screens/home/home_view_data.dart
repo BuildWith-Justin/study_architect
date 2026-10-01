@@ -24,6 +24,10 @@ class HomeViewData {
   final Map<String, Subject> subjectsById;
   final List<Task> todayTasks;
 
+  /// Days (yyyy-MM-dd) with at least one completed session. Powers the
+  /// 7-day streak strip on Home (V2 step 6).
+  final Set<String> completedDates;
+
   const HomeViewData({
     required this.student,
     required this.todayMinutes,
@@ -36,13 +40,26 @@ class HomeViewData {
     required this.todaySessions,
     required this.subjectsById,
     required this.todayTasks,
+    this.completedDates = const <String>{},
   });
 
-  double get todayProgress =>
-      dailyGoalMinutes == 0 ? 0 : (todayMinutes / dailyGoalMinutes).clamp(0.0, 1.0);
+  double get todayProgress => dailyGoalMinutes == 0
+      ? 0
+      : (todayMinutes / dailyGoalMinutes).clamp(0.0, 1.0);
 
-  int get weeklyGoalPercent =>
-      weeklyGoalMinutes == 0 ? 0 : ((weeklyMinutes / weeklyGoalMinutes) * 100).round();
+  int get weeklyGoalPercent => weeklyGoalMinutes == 0
+      ? 0
+      : ((weeklyMinutes / weeklyGoalMinutes) * 100).round();
+
+  /// True when [day] has at least one completed study session.
+  bool studiedOn(DateTime day) => completedDates.contains(_dateKey(day));
+
+  static String _dateKey(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
 
   static Future<HomeViewData> load() async {
     final studentRepo = StudentRepository();
@@ -56,7 +73,8 @@ class HomeViewData {
 
     final student = await studentRepo.getCurrent();
     if (student == null) {
-      throw StateError('HomeViewData.load() called before onboarding completed.');
+      throw StateError(
+          'HomeViewData.load() called before onboarding completed.');
     }
 
     final subjects = await subjectRepo.getAll();
@@ -79,6 +97,7 @@ class HomeViewData {
       todaySessions: todaySessions,
       subjectsById: subjectsById,
       todayTasks: todayTasks,
+      completedDates: completedDates,
     );
   }
 }
