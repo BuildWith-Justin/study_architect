@@ -13,6 +13,7 @@ import '../../features/auth/set_password_screen.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../features/auth/auth_diagnostics_screen.dart';
 import '../progress/progress_screen.dart';
+import '../tasks/tasks_screen.dart';
 import 'backup_screen.dart';
 import 'edit_goals_screen.dart';
 import 'edit_profile_screen.dart';
@@ -384,6 +385,25 @@ class _MoreScreenState extends State<MoreScreen>
                 child: _rowLabelValue(
                   'Progress',
                   'Charts, streak, insights',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+              _SectionCard(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TasksScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Tasks',
+                  'Assignments, readings, revision',
                 ),
               ),
 
