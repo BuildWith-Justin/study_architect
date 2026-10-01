@@ -1,0 +1,3038 @@
+STEP 7 DUMP
+
+===== LIB FILE TREE =====
+.\lib\main.dart
+.\lib\.github\workflows\supabase-keepalive.yml
+.\lib\app\app.dart
+.\lib\app\route_observer.dart
+.\lib\app\routes.dart
+.\lib\app\startup_decider.dart
+.\lib\app\theme_controller.dart
+.\lib\core\data_refresh_bus.dart
+.\lib\core\refreshable_screen.dart
+.\lib\core\sync\syncable.dart
+.\lib\features\auth\auth_diagnostics_screen.dart
+.\lib\features\auth\auth_gate.dart
+.\lib\features\auth\auth_service.dart
+.\lib\features\auth\auth_widgets.dart
+.\lib\features\auth\password_prompt_card.dart
+.\lib\features\auth\password_prompt_gate.dart
+.\lib\features\auth\set_password_screen.dart
+.\lib\features\auth\sign_in_screen.dart
+.\lib\features\auth\sign_up_screen.dart
+.\lib\models\settings.dart
+.\lib\models\student.dart
+.\lib\models\study_session.dart
+.\lib\models\subject.dart
+.\lib\models\task.dart
+.\lib\models\topic.dart
+.\lib\repositories\session_repository.dart
+.\lib\repositories\settings_repository.dart
+.\lib\repositories\student_repository.dart
+.\lib\repositories\subject_repository.dart
+.\lib\repositories\task_repository.dart
+.\lib\repositories\topic_repository.dart
+.\lib\screens\home\home_screen.dart
+.\lib\screens\home\home_view_data.dart
+.\lib\screens\more\backup_screen.dart
+.\lib\screens\more\edit_goals_screen.dart
+.\lib\screens\more\edit_profile_screen.dart
+.\lib\screens\more\more_screen.dart
+.\lib\screens\more\more_view_data.dart
+.\lib\screens\onboarding\goal_dial_screen.dart
+.\lib\screens\onboarding\goal_setup_screen.dart
+.\lib\screens\onboarding\onboarding_flow.dart
+.\lib\screens\onboarding\profile_setup_screen.dart
+.\lib\screens\onboarding\subject_setup_screen.dart
+.\lib\screens\onboarding\subjects_setup_screen.dart
+.\lib\screens\onboarding\welcome_screen.dart
+.\lib\screens\plan\plan_session_screen.dart
+.\lib\screens\progress\progress_screen.dart
+.\lib\screens\progress\progress_view_data.dart
+.\lib\screens\session\focus_timer_screen.dart
+.\lib\screens\subjects\add_edit_subject_screen.dart
+.\lib\screens\subjects\subject_detail_screen.dart
+.\lib\screens\subjects\subjects_screen.dart
+.\lib\screens\subjects\subjects_view_data.dart
+.\lib\screens\tasks\add_edit_task_screen.dart
+.\lib\screens\tasks\tasks_screen.dart
+.\lib\screens\tasks\tasks_view_data.dart
+.\lib\screens\timetable\add_edit_session_screen.dart
+.\lib\screens\timetable\plan_session_screen.dart
+.\lib\screens\timetable\timetable_screen.dart
+.\lib\screens\timetable\timetable_view_data.dart
+.\lib\services\backup_service.dart
+.\lib\services\database_service.dart
+.\lib\services\notification_service.dart
+.\lib\services\sync_schema.dart
+.\lib\services\sync_service.dart
+.\lib\theme\app_theme.dart
+.\lib\theme\dark_theme.dart
+.\lib\theme\light_theme.dart
+.\lib\theme\theme_helpers.dart
+.\lib\utils\date_utils.dart
+.\lib\utils\study_insights.dart
+.\lib\utils\study_stats.dart
+.\lib\widgets\app_buttons.dart
+.\lib\widgets\app_logo.dart
+.\lib\widgets\async_builder.dart
+.\lib\widgets\class_card.dart
+.\lib\widgets\daily_goal_dial.dart
+.\lib\widgets\gradient_background.dart
+.\lib\widgets\insight_carousel.dart
+.\lib\widgets\main_scaffold.dart
+.\lib\widgets\pastel_card.dart
+.\lib\widgets\progress_card.dart
+.\lib\widgets\schedule_row.dart
+.\lib\widgets\screen_placeholder.dart
+.\lib\widgets\simple_bar_chart.dart
+.\lib\widgets\splash_view.dart
+.\lib\widgets\stat_card.dart
+.\lib\widgets\subject_card.dart
+.\lib\widgets\task_card.dart
+.\lib\widgets\timeline_event_card.dart
+.\lib\widgets\topic_row.dart
+
+===== FILE: .\lib\core\data_refresh_bus.dart =====
+import 'dart:async';
+
+enum RefreshScope {
+  subjects,
+  sessions,
+  tasks,
+  exams,
+  achievements,
+  all,
+}
+
+class DataRefreshBus {
+  DataRefreshBus._internal();
+  static final DataRefreshBus instance = DataRefreshBus._internal();
+
+  final StreamController<RefreshScope> _controller =
+      StreamController<RefreshScope>.broadcast();
+
+  Stream<RefreshScope> get stream => _controller.stream;
+
+  void notify(RefreshScope scope) {
+    _controller.add(scope);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+===== FILE: .\lib\core\refreshable_screen.dart =====
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'data_refresh_bus.dart';
+
+/// Mixin any StatefulWidget's State with this to get:
+/// - auto-refresh when relevant data changes elsewhere in the app
+/// - pull-to-refresh wired to the same reload function
+mixin RefreshableScreenMixin<T extends StatefulWidget> on State<T> {
+  StreamSubscription<RefreshScope>? _refreshSub;
+
+  /// Override: which scopes should trigger a refresh on this screen
+  List<RefreshScope> get watchedScopes => [RefreshScope.all];
+
+  /// Override: how this screen reloads its data
+  Future<void> onRefresh();
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshSub = DataRefreshBus.instance.stream.listen((scope) {
+      if (watchedScopes.contains(scope) || scope == RefreshScope.all) {
+        onRefresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshSub?.cancel();
+    super.dispose();
+  }
+
+  Widget buildRefreshable({required Widget child}) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: child,
+    );
+  }
+}
+
+===== FILE: .\lib\main.dart =====
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app/app.dart';
+import 'features/auth/auth_service.dart';
+import 'services/notification_service.dart';
+import 'services/sync_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Plain sqflite only ships a native database engine for Android/iOS.
+  // On Windows and Linux desktop there is no such engine bundled, so
+  // sqflite_common_ffi's databaseFactory must be installed explicitly
+  // before DatabaseService (or anything else) opens a database —
+  // otherwise every DB call throws "databaseFactory not initialized."
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  // V2: load Supabase credentials from .env and start the client.
+  // Wrapped in try/catch so a missing .env or a Supabase problem never
+  // stops the local-first app from launching.
+  try {
+    await dotenv.load(fileName: '.env');
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL']!,
+      publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    );
+    // Only flips to true when init fully succeeded. AuthGate reads this
+    // so it never touches Supabase.instance when the client isn't ready.
+    AuthService.isAvailable = true;
+    debugPrint('Supabase initialized OK');
+
+    // V2 Step 4: start local <-> cloud sync (does nothing until signed in).
+    SyncService.instance.start();
+  } catch (e) {
+    AuthService.isAvailable = false;
+    debugPrint('Supabase init failed: $e');
+  }
+
+  // Safe no-op on Web — see notification_service.dart for why.
+  await NotificationService.instance.init();
+  runApp(const StudyArchitectApp());
+}
+
+===== FILE: .\lib\models\study_session.dart =====
+enum SessionStatus { planned, inProgress, completed, missed }
+
+SessionStatus statusFromString(String value) {
+  return SessionStatus.values.firstWhere(
+    (s) => s.name == value,
+    orElse: () => SessionStatus.planned,
+  );
+}
+
+class StudySession {
+  final String id;
+  final String subjectId;
+  final String? topicId;
+  final DateTime scheduledDate;
+  final DateTime startTime;
+  final DateTime endTime;
+  final int? actualDuration; // minutes, filled in once a session runs
+  final SessionStatus status;
+  final String notes;
+  final int? rating; // 1-5, optional, set at session end
+  final bool complete;
+
+  const StudySession({
+    required this.id,
+    required this.subjectId,
+    this.topicId,
+    required this.scheduledDate,
+    required this.startTime,
+    required this.endTime,
+    this.actualDuration,
+    this.status = SessionStatus.planned,
+    this.notes = '',
+    this.rating,
+    this.complete = false,
+  });
+
+  /// Business rule: a session cannot be saved with an end time earlier
+  /// than or equal to its start time.
+  bool get isTimeRangeValid => endTime.isAfter(startTime);
+
+  StudySession copyWith({
+    String? id,
+    String? subjectId,
+    String? topicId,
+    DateTime? scheduledDate,
+    DateTime? startTime,
+    DateTime? endTime,
+    int? actualDuration,
+    SessionStatus? status,
+    String? notes,
+    int? rating,
+    bool? complete,
+  }) {
+    return StudySession(
+      id: id ?? this.id,
+      subjectId: subjectId ?? this.subjectId,
+      topicId: topicId ?? this.topicId,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      actualDuration: actualDuration ?? this.actualDuration,
+      status: status ?? this.status,
+      notes: notes ?? this.notes,
+      rating: rating ?? this.rating,
+      complete: complete ?? this.complete,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'subjectId': subjectId,
+        'topicId': topicId,
+        'scheduledDate': scheduledDate.toIso8601String(),
+        'startTime': startTime.toIso8601String(),
+        'endTime': endTime.toIso8601String(),
+        'actualDuration': actualDuration,
+        'status': status.name,
+        'notes': notes,
+        'rating': rating,
+        'complete': complete ? 1 : 0,
+      };
+
+  factory StudySession.fromMap(Map<String, dynamic> map) => StudySession(
+        id: map['id'] as String,
+        subjectId: map['subjectId'] as String,
+        topicId: map['topicId'] as String?,
+        scheduledDate: DateTime.parse(map['scheduledDate'] as String),
+        startTime: DateTime.parse(map['startTime'] as String),
+        endTime: DateTime.parse(map['endTime'] as String),
+        actualDuration: map['actualDuration'] as int?,
+        status: statusFromString(map['status'] as String),
+        notes: map['notes'] as String? ?? '',
+        rating: map['rating'] as int?,
+        complete: (map['complete'] as int) == 1,
+      );
+}
+
+===== FILE: .\lib\models\task.dart =====
+enum TaskType { assignment, reading, revision, project, other }
+
+TaskType taskTypeFromString(String value) {
+  return TaskType.values.firstWhere(
+    (t) => t.name == value,
+    orElse: () => TaskType.other,
+  );
+}
+
+class Task {
+  final String id;
+  final String title;
+  final String subjectId;
+  final String? topicId;
+  final DateTime dueDate;
+  final TaskType type;
+  final String notes;
+  final bool completed;
+  final DateTime createdAt;
+
+  const Task({
+    required this.id,
+    required this.title,
+    required this.subjectId,
+    this.topicId,
+    required this.dueDate,
+    this.type = TaskType.other,
+    this.notes = '',
+    this.completed = false,
+    required this.createdAt,
+  });
+
+  Task copyWith({
+    String? id,
+    String? title,
+    String? subjectId,
+    String? topicId,
+    DateTime? dueDate,
+    TaskType? type,
+    String? notes,
+    bool? completed,
+    DateTime? createdAt,
+  }) {
+    return Task(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subjectId: subjectId ?? this.subjectId,
+      topicId: topicId ?? this.topicId,
+      dueDate: dueDate ?? this.dueDate,
+      type: type ?? this.type,
+      notes: notes ?? this.notes,
+      completed: completed ?? this.completed,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'subjectId': subjectId,
+        'topicId': topicId,
+        'dueDate': dueDate.toIso8601String(),
+        'type': type.name,
+        'notes': notes,
+        'completed': completed ? 1 : 0,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory Task.fromMap(Map<String, dynamic> map) => Task(
+        id: map['id'] as String,
+        title: map['title'] as String,
+        subjectId: map['subjectId'] as String,
+        topicId: map['topicId'] as String?,
+        dueDate: DateTime.parse(map['dueDate'] as String),
+        type: taskTypeFromString(map['type'] as String),
+        notes: map['notes'] as String? ?? '',
+        completed: (map['completed'] as int) == 1,
+        createdAt: DateTime.parse(map['createdAt'] as String),
+      );
+}
+
+===== FILE: .\lib\repositories\session_repository.dart =====
+import '../models/study_session.dart';
+import '../services/database_service.dart';
+
+class SessionRepository {
+  final _db = DatabaseService.instance;
+
+  /// Throws if the session's end time is not after its start time —
+  /// enforces the V1 business rule at the persistence boundary.
+  Future<void> create(StudySession session) async {
+    if (!session.isTimeRangeValid) {
+      throw ArgumentError('Session end time must be after start time.');
+    }
+    final db = await _db.database;
+    await db.insert('study_sessions', session.toMap());
+  }
+
+  Future<void> update(StudySession session) async {
+    if (!session.isTimeRangeValid) {
+      throw ArgumentError('Session end time must be after start time.');
+    }
+    final db = await _db.database;
+    await db.update(
+      'study_sessions',
+      session.toMap(),
+      where: 'id = ?',
+      whereArgs: [session.id],
+    );
+  }
+
+  Future<void> delete(String id) async {
+    final db = await _db.database;
+    await db.delete('study_sessions', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<StudySession?> getById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query('study_sessions', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    return StudySession.fromMap(rows.first);
+  }
+
+  /// Sessions scheduled on one calendar day — powers Home's "today's
+  /// schedule" and the streak calculation (Step 9).
+  Future<List<StudySession>> getForDate(DateTime date) async {
+    final db = await _db.database;
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final rows = await db.query(
+      'study_sessions',
+      where: 'scheduledDate >= ? AND scheduledDate < ?',
+      whereArgs: [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
+      orderBy: 'startTime ASC',
+    );
+    return rows.map(StudySession.fromMap).toList();
+  }
+
+  /// Sessions within an inclusive date range — powers the Timetable
+  /// week view and Progress screen (Step 8, Step 9).
+  Future<List<StudySession>> getForRange(DateTime start, DateTime end) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'study_sessions',
+      where: 'scheduledDate >= ? AND scheduledDate <= ?',
+      whereArgs: [start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'startTime ASC',
+    );
+    return rows.map(StudySession.fromMap).toList();
+  }
+
+  Future<List<StudySession>> getForSubject(String subjectId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'study_sessions',
+      where: 'subjectId = ?',
+      whereArgs: [subjectId],
+      orderBy: 'scheduledDate DESC',
+    );
+    return rows.map(StudySession.fromMap).toList();
+  }
+
+  /// Distinct calendar dates (as yyyy-MM-dd strings) that have at
+  /// least one completed session — the raw material for the streak
+  /// calculation in utils/study_stats.dart.
+  Future<Set<String>> getCompletedDates() async {
+    final db = await _db.database;
+    final rows = await db.rawQuery('''
+      SELECT DISTINCT substr(scheduledDate, 1, 10) as day
+      FROM study_sessions
+      WHERE complete = 1
+    ''');
+    return rows.map((r) => r['day'] as String).toSet();
+  }
+
+  /// Every session ever recorded — used by the Progress screen's
+  /// "All time" view.
+  Future<List<StudySession>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('study_sessions', orderBy: 'scheduledDate ASC');
+    return rows.map(StudySession.fromMap).toList();
+  }
+}
+
+===== FILE: .\lib\repositories\task_repository.dart =====
+import '../models/task.dart';
+import '../services/database_service.dart';
+
+class TaskRepository {
+  final _db = DatabaseService.instance;
+
+  Future<void> create(Task task) async {
+    final db = await _db.database;
+    await db.insert('tasks', task.toMap());
+  }
+
+  Future<void> update(Task task) async {
+    final db = await _db.database;
+    await db.update('tasks', task.toMap(), where: 'id = ?', whereArgs: [task.id]);
+  }
+
+  Future<void> delete(String id) async {
+    final db = await _db.database;
+    await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> setCompleted(String id, bool completed) async {
+    final db = await _db.database;
+    await db.update(
+      'tasks',
+      {'completed': completed ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Task>> getForDate(DateTime date) async {
+    final db = await _db.database;
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final rows = await db.query(
+      'tasks',
+      where: 'dueDate >= ? AND dueDate < ?',
+      whereArgs: [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
+      orderBy: 'dueDate ASC',
+    );
+    return rows.map(Task.fromMap).toList();
+  }
+
+  Future<List<Task>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('tasks', orderBy: 'dueDate ASC');
+    return rows.map(Task.fromMap).toList();
+  }
+
+  Future<List<Task>> getForSubject(String subjectId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'tasks',
+      where: 'subjectId = ?',
+      whereArgs: [subjectId],
+      orderBy: 'dueDate ASC',
+    );
+    return rows.map(Task.fromMap).toList();
+  }
+}
+
+===== FILE: .\lib\screens\plan\plan_session_screen.dart =====
+import 'package:flutter/material.dart';
+import '../../widgets/screen_placeholder.dart';
+import '../../widgets/gradient_background.dart';
+
+/// Pushed when the "+" nav item is tapped. Full form (subject, topic,
+/// date, start/end time, location, notes) is built in later steps
+/// once Subjects (Step 7) and local storage (Step 4) exist.
+class PlanSessionScreen extends StatelessWidget {
+  const PlanSessionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(
+                title: const Text('Plan a session'),
+                leading: const BackButton(),
+              ),
+              const Expanded(
+                child: ScreenPlaceholder(
+                  title: 'Plan your next study block',
+                  note: 'Full form lands once Subjects and local storage exist.',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+===== FILE: .\lib\screens\tasks\add_edit_task_screen.dart =====
+import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../../models/task.dart';
+import '../../models/subject.dart';
+import '../../models/topic.dart';
+import '../../repositories/task_repository.dart';
+import '../../repositories/subject_repository.dart';
+import '../../repositories/topic_repository.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/gradient_background.dart';
+import '../../widgets/app_buttons.dart';
+
+class AddEditTaskScreen extends StatefulWidget {
+  final Task? existing;
+
+  const AddEditTaskScreen({super.key, this.existing});
+
+  @override
+  State<AddEditTaskScreen> createState() => _AddEditTaskScreenState();
+}
+
+class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
+  final _taskRepo = TaskRepository();
+  final _subjectRepo = SubjectRepository();
+  final _topicRepo = TopicRepository();
+  final _titleController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  List<Subject> _subjects = [];
+  List<Topic> _topics = [];
+  String? _subjectId;
+  String? _topicId;
+  TaskType _type = TaskType.assignment;
+  late DateTime _dueDate;
+  bool _loading = true;
+  bool _saving = false;
+
+  bool get _isEditing => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _titleController.text = existing?.title ?? '';
+    _notesController.text = existing?.notes ?? '';
+    _subjectId = existing?.subjectId;
+    _topicId = existing?.topicId;
+    _type = existing?.type ?? TaskType.assignment;
+    _dueDate = existing?.dueDate ?? DateTime.now();
+    _loadSubjects();
+  }
+
+  Future<void> _loadSubjects() async {
+    final subjects = await _subjectRepo.getAll();
+    setState(() {
+      _subjects = subjects;
+      _subjectId ??= subjects.isNotEmpty ? subjects.first.id : null;
+      _loading = false;
+    });
+    if (_subjectId != null) _loadTopics(_subjectId!);
+  }
+
+  Future<void> _loadTopics(String subjectId) async {
+    final topics = await _topicRepo.getForSubject(subjectId);
+    setState(() {
+      _topics = topics;
+      if (!_topics.any((t) => t.id == _topicId)) _topicId = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDueDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _dueDate = picked);
+  }
+
+  Future<void> _save() async {
+    final title = _titleController.text.trim();
+    if (title.isEmpty || _subjectId == null) return;
+
+    setState(() => _saving = true);
+
+    final task = Task(
+      id: widget.existing?.id ?? const Uuid().v4(),
+      title: title,
+      subjectId: _subjectId!,
+      topicId: _topicId,
+      dueDate: _dueDate,
+      type: _type,
+      notes: _notesController.text.trim(),
+      completed: widget.existing?.completed ?? false,
+      createdAt: widget.existing?.createdAt ?? DateTime.now(),
+    );
+
+    if (_isEditing) {
+      await _taskRepo.update(task);
+    } else {
+      await _taskRepo.create(task);
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete task?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _taskRepo.delete(widget.existing!.id);
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(
+                title: Text(_isEditing ? 'Edit task' : 'New task'),
+                leading: const BackButton(),
+                actions: [
+                  if (_isEditing)
+                    IconButton(icon: const Icon(Icons.delete_outline), onPressed: _delete),
+                ],
+              ),
+              if (_loading)
+                const Expanded(child: Center(child: CircularProgressIndicator()))
+              else
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    children: [
+                      _FieldLabel('Title'),
+                      TextField(
+                        controller: _titleController,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(hint: 'Complete 20 calculus questions'),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      if (_subjects.isEmpty)
+                        Text(
+                          'Add a subject first (Subjects tab) before creating a task.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                        )
+                      else ...[
+                        _FieldLabel('Subject'),
+                        DropdownButtonFormField<String>(
+                          value: _subjectId,
+                          decoration: _fieldDecoration(),
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+                          items: _subjects
+                              .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() => _subjectId = value);
+                            _loadTopics(value);
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _FieldLabel('Topic (optional)'),
+                        DropdownButtonFormField<String?>(
+                          value: _topicId,
+                          decoration: _fieldDecoration(),
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('None')),
+                            ..._topics.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                          ],
+                          onChanged: (value) => setState(() => _topicId = value),
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      _FieldLabel('Type'),
+                      DropdownButtonFormField<TaskType>(
+                        value: _type,
+                        decoration: _fieldDecoration(),
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+                        items: TaskType.values
+                            .map((t) => DropdownMenuItem(value: t, child: Text(_typeLabel(t))))
+                            .toList(),
+                        onChanged: (value) => setState(() => _type = value!),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      _FieldLabel('Due date'),
+                      InkWell(
+                        onTap: _pickDueDate,
+                        borderRadius: BorderRadius.circular(AppRadii.control),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(AppRadii.control),
+                          ),
+                          child: Text(
+                            '${_dueDate.year}-${_dueDate.month.toString().padLeft(2, '0')}-${_dueDate.day.toString().padLeft(2, '0')}',
+                            style: const TextStyle(color: AppColors.textPrimary),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      _FieldLabel('Notes'),
+                      TextField(
+                        controller: _notesController,
+                        maxLines: 3,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      PrimaryButton(
+                        label: _saving ? 'Saving...' : 'Save Task',
+                        onPressed: (_saving || _titleController.text.trim().isEmpty || _subjectId == null)
+                            ? null
+                            : _save,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _typeLabel(TaskType type) {
+    switch (type) {
+      case TaskType.assignment:
+        return 'Assignment';
+      case TaskType.reading:
+        return 'Reading';
+      case TaskType.revision:
+        return 'Revision';
+      case TaskType.project:
+        return 'Project';
+      case TaskType.other:
+        return 'Other';
+    }
+  }
+
+  InputDecoration _fieldDecoration({String? hint}) => InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: AppColors.surfaceLight,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          borderSide: BorderSide.none,
+        ),
+      );
+}
+
+class _FieldLabel extends StatelessWidget {
+  final String text;
+  const _FieldLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+      ),
+    );
+  }
+}
+
+===== FILE: .\lib\screens\tasks\tasks_screen.dart =====
+
+import 'package:flutter/material.dart';
+import '../../models/task.dart';
+import '../../repositories/task_repository.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+import '../../widgets/gradient_background.dart';
+import 'tasks_view_data.dart';
+import 'add_edit_task_screen.dart';
+
+class TasksScreen extends StatefulWidget {
+  const TasksScreen({super.key});
+
+  @override
+  State<TasksScreen> createState() => _TasksScreenState();
+}
+
+class _TasksScreenState extends State<TasksScreen> {
+  final _taskRepo = TaskRepository();
+  late Future<TasksViewData> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = TasksViewData.load();
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _future = TasksViewData.load();
+    });
+
+    await _future;
+  }
+
+  Future<void> _toggle(Task task) async {
+    await _taskRepo.setCompleted(
+      task.id,
+      !task.completed,
+    );
+
+    await _reload();
+  }
+
+  Future<void> _openCreate() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const AddEditTaskScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    await _reload();
+  }
+
+  Future<void> _openEdit(Task task) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AddEditTaskScreen(
+          existing: task,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    await _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: FutureBuilder<TasksViewData>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+
+              final data = snapshot.data!;
+
+              final hasAnyTasks =
+                  data.overdue.isNotEmpty ||
+                  data.today.isNotEmpty ||
+                  data.tomorrow.isNotEmpty ||
+                  data.upcoming.isNotEmpty;
+
+              return Column(
+                children: [
+                  AppBar(
+                    title: const Text(
+                      'Things you need to accomplish',
+                    ),
+                    leading: const BackButton(),
+                    actions: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.add_circle_rounded,
+                        ),
+                        onPressed: _openCreate,
+                      ),
+                    ],
+                  ),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _reload,
+                      child: !hasAnyTasks
+                          ? ListView(
+                              physics:
+                                  const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height *
+                                          0.6,
+                                  child: Center(
+                                    child: Text(
+                                      'No tasks yet — tap + to add one.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color:
+                                                AppColors.textSecondary,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView(
+                              physics:
+                                  const AlwaysScrollableScrollPhysics(),
+                              padding:
+                                  const EdgeInsets.all(AppSpacing.lg),
+                              children: [
+                                if (data.overdue.isNotEmpty)
+                                  _TaskGroup(
+                                    title: 'Overdue',
+                                    tasks: data.overdue,
+                                    data: data,
+                                    onToggle: _toggle,
+                                    onTap: _openEdit,
+                                  ),
+                                if (data.today.isNotEmpty)
+                                  _TaskGroup(
+                                    title: 'Today',
+                                    tasks: data.today,
+                                    data: data,
+                                    onToggle: _toggle,
+                                    onTap: _openEdit,
+                                  ),
+                                if (data.tomorrow.isNotEmpty)
+                                  _TaskGroup(
+                                    title: 'Tomorrow',
+                                    tasks: data.tomorrow,
+                                    data: data,
+                                    onToggle: _toggle,
+                                    onTap: _openEdit,
+                                  ),
+                                if (data.upcoming.isNotEmpty)
+                                  _TaskGroup(
+                                    title: 'Upcoming',
+                                    tasks: data.upcoming,
+                                    data: data,
+                                    onToggle: _toggle,
+                                    onTap: _openEdit,
+                                  ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskGroup extends StatelessWidget {
+  final String title;
+  final List<Task> tasks;
+  final TasksViewData data;
+  final ValueChanged<Task> onToggle;
+  final ValueChanged<Task> onTap;
+
+  const _TaskGroup({
+    required this.title,
+    required this.tasks,
+    required this.data,
+    required this.onToggle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        bottom: AppSpacing.lg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ...tasks.map((task) {
+            final subject = data.subjectsById[task.subjectId];
+
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              onTap: () => onTap(task),
+              leading: Checkbox(
+                value: task.completed,
+                onChanged: (_) => onToggle(task),
+                activeColor: subject != null
+                    ? Color(subject.colorValue)
+                    : AppColors.accentPurpleStrong,
+              ),
+              title: Text(
+                task.title,
+                style: TextStyle(
+                  decoration: task.completed
+                      ? TextDecoration.lineThrough
+                      : null,
+                  color: task.completed
+                      ? AppColors.textSecondary
+                      : context.primaryText,
+                ),
+              ),
+              subtitle: Text(
+                subject?.name ?? 'Unknown subject',
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+
+===== FILE: .\lib\screens\tasks\tasks_view_data.dart =====
+import '../../models/subject.dart';
+import '../../models/task.dart';
+import '../../repositories/subject_repository.dart';
+import '../../repositories/task_repository.dart';
+import '../../utils/date_utils.dart';
+
+/// All tasks bucketed the way the Tasks screen displays them, plus
+/// subject lookups for each task's colored tag.
+class TasksViewData {
+  final List<Task> overdue;
+  final List<Task> today;
+  final List<Task> tomorrow;
+  final List<Task> upcoming;
+  final Map<String, Subject> subjectsById;
+
+  const TasksViewData({
+    required this.overdue,
+    required this.today,
+    required this.tomorrow,
+    required this.upcoming,
+    required this.subjectsById,
+  });
+
+  static Future<TasksViewData> load() async {
+    final taskRepo = TaskRepository();
+    final subjectRepo = SubjectRepository();
+
+    final allTasks = await taskRepo.getAll();
+    final subjects = await subjectRepo.getAll();
+    final subjectsById = {for (final s in subjects) s.id: s};
+
+    final now = DateTime.now();
+    final today = startOfDay(now);
+    final tomorrow = today.add(const Duration(days: 1));
+    final dayAfterTomorrow = today.add(const Duration(days: 2));
+
+    // Completed tasks stay visible in their original bucket (crossed
+    // out) rather than disappearing, so finishing something today
+    // doesn't make it look like it vanished.
+    final pending = allTasks;
+
+    final overdueList = pending
+        .where((t) => !t.completed && t.dueDate.isBefore(today))
+        .toList();
+    final todayList = pending
+        .where((t) => isSameDay(t.dueDate, today))
+        .toList();
+    final tomorrowList = pending
+        .where((t) => isSameDay(t.dueDate, tomorrow))
+        .toList();
+    final upcomingList = pending
+        .where((t) => t.dueDate.isAfter(dayAfterTomorrow) || isSameDay(t.dueDate, dayAfterTomorrow))
+        .toList();
+
+    for (final list in [overdueList, todayList, tomorrowList, upcomingList]) {
+      list.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    }
+
+    return TasksViewData(
+      overdue: overdueList,
+      today: todayList,
+      tomorrow: tomorrowList,
+      upcoming: upcomingList,
+      subjectsById: subjectsById,
+    );
+  }
+}
+
+===== FILE: .\lib\screens\timetable\add_edit_session_screen.dart =====
+import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../../models/study_session.dart';
+import '../../models/subject.dart';
+import '../../models/topic.dart';
+import '../../repositories/session_repository.dart';
+import '../../repositories/subject_repository.dart';
+import '../../repositories/topic_repository.dart';
+import '../../services/notification_service.dart';
+import '../../theme/app_theme.dart';
+import '../../utils/date_utils.dart';
+import '../../widgets/gradient_background.dart';
+import '../../widgets/app_buttons.dart';
+
+/// Handles both creating a session (pass no [existing]) and editing
+/// one. [initialDate] pre-selects a date for new sessions (e.g. the
+/// day currently selected on the Timetable screen). Pops `true` on
+/// save/delete so the caller knows to reload.
+class AddEditSessionScreen extends StatefulWidget {
+  final StudySession? existing;
+  final DateTime? initialDate;
+
+  const AddEditSessionScreen({
+    super.key,
+    this.existing,
+    this.initialDate,
+  });
+
+  @override
+  State<AddEditSessionScreen> createState() =>
+      _AddEditSessionScreenState();
+}
+
+class _AddEditSessionScreenState
+    extends State<AddEditSessionScreen> {
+  final _subjectRepo = SubjectRepository();
+  final _topicRepo = TopicRepository();
+  final _sessionRepo = SessionRepository();
+  final _notesController = TextEditingController();
+
+  List<Subject> _subjects = [];
+  List<Topic> _topics = [];
+
+  String? _subjectId;
+  String? _topicId;
+
+  late DateTime _date;
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  bool get _isEditing => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final existing = widget.existing;
+
+    _date =
+        existing?.scheduledDate ??
+        widget.initialDate ??
+        DateTime.now();
+
+    _startTime = existing != null
+        ? TimeOfDay.fromDateTime(existing.startTime)
+        : const TimeOfDay(hour: 16, minute: 0);
+
+    _endTime = existing != null
+        ? TimeOfDay.fromDateTime(existing.endTime)
+        : const TimeOfDay(hour: 18, minute: 0);
+
+    _subjectId = existing?.subjectId;
+    _topicId = existing?.topicId;
+    _notesController.text = existing?.notes ?? '';
+
+    _loadSubjects();
+  }
+
+  Future<void> _loadSubjects() async {
+    try {
+      final subjects = await _subjectRepo.getAll();
+
+      if (!mounted) return;
+
+      setState(() {
+        _subjects = subjects;
+        _subjectId ??=
+            subjects.isNotEmpty ? subjects.first.id : null;
+        _loading = false;
+      });
+
+      if (_subjectId != null) {
+        await _loadTopics(_subjectId!);
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _loading = false;
+        _error = 'Could not load subjects.';
+      });
+    }
+  }
+
+  Future<void> _loadTopics(String subjectId) async {
+    try {
+      final topics =
+          await _topicRepo.getForSubject(subjectId);
+
+      if (!mounted) return;
+
+      setState(() {
+        _topics = topics;
+
+        if (!_topics.any((t) => t.id == _topicId)) {
+          _topicId = null;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _topics = [];
+        _topicId = null;
+      });
+    }
+  }
+
+  DateTime _combine(
+    DateTime date,
+    TimeOfDay time,
+  ) {
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate:
+          DateTime.now().subtract(const Duration(days: 365)),
+      lastDate:
+          DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _date = picked;
+    });
+  }
+
+  Future<void> _pickTime({
+    required bool isStart,
+  }) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime:
+          isStart ? _startTime : _endTime,
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      if (isStart) {
+        _startTime = picked;
+      } else {
+        _endTime = picked;
+      }
+    });
+  }
+
+  Future<void> _save() async {
+    if (_subjectId == null) {
+      setState(() {
+        _error = 'Choose a subject first.';
+      });
+      return;
+    }
+
+    final start = _combine(
+      _date,
+      _startTime,
+    );
+
+    final end = _combine(
+      _date,
+      _endTime,
+    );
+
+    final session = StudySession(
+      id: widget.existing?.id ?? const Uuid().v4(),
+      subjectId: _subjectId!,
+      topicId: _topicId,
+      scheduledDate: startOfDay(_date),
+      startTime: start,
+      endTime: end,
+      notes: _notesController.text.trim(),
+      status:
+          widget.existing?.status ??
+          SessionStatus.planned,
+      complete:
+          widget.existing?.complete ?? false,
+      actualDuration:
+          widget.existing?.actualDuration,
+      rating: widget.existing?.rating,
+    );
+
+    if (!session.isTimeRangeValid) {
+      setState(() {
+        _error =
+            'End time must be after start time.';
+      });
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      if (_isEditing) {
+        await _sessionRepo.update(session);
+      } else {
+        await _sessionRepo.create(session);
+      }
+
+      final subject = _subjects.firstWhere(
+        (s) => s.id == session.subjectId,
+        orElse: () => _subjects.first,
+      );
+
+      await NotificationService.instance
+          .scheduleSessionReminder(
+        sessionId: session.id,
+        subjectName: subject.name,
+        sessionStart: session.startTime,
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _saving = false;
+        _error =
+            'Could not save the session. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete session?'),
+        content: const Text(
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.redAccent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _sessionRepo.delete(
+        widget.existing!.id,
+      );
+
+      await NotificationService.instance
+          .cancelSessionReminder(
+        widget.existing!.id,
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _error =
+            'Could not delete the session. Please try again.';
+      });
+    }
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return time.format(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(
+                title: Text(
+                  _isEditing
+                      ? 'Edit session'
+                      : 'Plan your next study block',
+                ),
+                leading: const BackButton(),
+                actions: [
+                  if (_isEditing)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                      ),
+                      onPressed:
+                          _saving ? null : _delete,
+                    ),
+                ],
+              ),
+              if (_loading)
+                const Expanded(
+                  child: Center(
+                    child:
+                        CircularProgressIndicator(),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView(
+                    padding:
+                        const EdgeInsets.all(
+                      AppSpacing.lg,
+                    ),
+                    children: [
+                      if (_subjects.isEmpty)
+                        Text(
+                          'Add a subject first (Subjects tab) before planning a session.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color:
+                                    AppColors.textSecondary,
+                              ),
+                        )
+                      else ...[
+                        _FieldLabel('Subject'),
+                        DropdownButtonFormField<String>(
+                          value: _subjectId,
+                          decoration:
+                              _fieldDecoration(),
+                          style: const TextStyle(
+                            color:
+                                AppColors.textPrimary,
+                            fontSize: 15,
+                          ),
+                          items: _subjects
+                              .map(
+                                (s) =>
+                                    DropdownMenuItem(
+                                  value: s.id,
+                                  child:
+                                      Text(s.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+
+                            setState(() {
+                              _subjectId = value;
+                              _topicId = null;
+                            });
+
+                            _loadTopics(value);
+                          },
+                        ),
+                        const SizedBox(
+                          height: AppSpacing.lg,
+                        ),
+                        _FieldLabel(
+                          'Topic (optional)',
+                        ),
+                        DropdownButtonFormField<String?>(
+                          value: _topicId,
+                          decoration:
+                              _fieldDecoration(),
+                          style: const TextStyle(
+                            color:
+                                AppColors.textPrimary,
+                            fontSize: 15,
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('None'),
+                            ),
+                            ..._topics.map(
+                              (t) =>
+                                  DropdownMenuItem(
+                                value: t.id,
+                                child:
+                                    Text(t.name),
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _topicId = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(
+                          height: AppSpacing.lg,
+                        ),
+                        _FieldLabel('Date'),
+                        _TapField(
+                          label:
+                              '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+                          onTap: _pickDate,
+                        ),
+                        const SizedBox(
+                          height: AppSpacing.lg,
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  _FieldLabel('Start'),
+                                  _TapField(
+                                    label:
+                                        _formatTime(
+                                      _startTime,
+                                    ),
+                                    onTap: () =>
+                                        _pickTime(
+                                      isStart: true,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(
+                              width: AppSpacing.md,
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  _FieldLabel('End'),
+                                  _TapField(
+                                    label:
+                                        _formatTime(
+                                      _endTime,
+                                    ),
+                                    onTap: () =>
+                                        _pickTime(
+                                      isStart: false,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(
+                          height: AppSpacing.lg,
+                        ),
+                        _FieldLabel('Notes'),
+                        TextField(
+                          controller:
+                              _notesController,
+                          maxLines: 3,
+                          style: const TextStyle(
+                            color:
+                                AppColors.textPrimary,
+                          ),
+                          decoration:
+                              _fieldDecoration(
+                            hint:
+                                'Practice integration questions',
+                          ),
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(
+                            height: AppSpacing.md,
+                          ),
+                          Text(
+                            _error!,
+                            style:
+                                const TextStyle(
+                              color:
+                                  Colors.redAccent,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(
+                          height: AppSpacing.xl,
+                        ),
+                        PrimaryButton(
+                          label: _saving
+                              ? 'Saving...'
+                              : 'Save Session',
+                          onPressed: _saving
+                              ? null
+                              : _save,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _fieldDecoration({
+    String? hint,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: AppColors.surfaceLight,
+      border: OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(
+          AppRadii.control,
+        ),
+        borderSide: BorderSide.none,
+      ),
+    );
+  }
+}
+
+class _FieldLabel extends StatelessWidget {
+  final String text;
+
+  const _FieldLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: Theme.of(context)
+            .textTheme
+            .bodySmall
+            ?.copyWith(
+              color:
+                  AppColors.textSecondary,
+            ),
+      ),
+    );
+  }
+}
+
+class _TapField extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _TapField({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius:
+          BorderRadius.circular(
+        AppRadii.control,
+      ),
+      child: Container(
+        width: double.infinity,
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 14,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius:
+              BorderRadius.circular(
+            AppRadii.control,
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+===== FILE: .\lib\screens\timetable\plan_session_screen.dart =====
+import 'package:flutter/material.dart';
+import '../timetable/add_edit_session_screen.dart';
+
+/// Pushed when the "+" nav item is tapped. Just forwards to the real
+/// session form — kept as its own file/route in case the "+" flow
+/// ever needs its own wrapper (e.g. picking Session vs Task) later.
+class PlanSessionScreen extends StatelessWidget {
+  const PlanSessionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const AddEditSessionScreen();
+  }
+}
+
+===== FILE: .\lib\screens\timetable\timetable_screen.dart =====
+import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+// ignore: unused_import
+import '../../models/subject.dart';
+import '../../widgets/timeline_event_card.dart';
+import '../../widgets/pastel_card.dart';
+import '../../widgets/async_builder.dart';
+import '../../widgets/gradient_background.dart';
+import '../../utils/date_utils.dart';
+import 'timetable_view_data.dart';
+import 'add_edit_session_screen.dart';
+
+class TimetableScreen extends StatefulWidget {
+  /// True when this screen is pushed on its own (e.g. from Home's
+  /// "View all") rather than shown as a tab body inside MainScaffold.
+  /// MainScaffold already supplies the gradient background and bottom
+  /// nav for the tab case, so this screen must not duplicate that —
+  /// but a standalone push needs its own Scaffold, background, and
+  /// back button, or it renders on a bare, unstyled surface.
+  final bool standalone;
+
+  const TimetableScreen({super.key, this.standalone = false});
+
+  @override
+  State<TimetableScreen> createState() => _TimetableScreenState();
+}
+
+class _TimetableScreenState extends State<TimetableScreen> {
+  late DateTime _selectedDay;
+  late Future<TimetableWeekData> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDay = startOfDay(DateTime.now());
+    _future = TimetableWeekData.load(_selectedDay);
+  }
+
+  /// Awaitable so both manual reload-after-edit calls and
+  /// pull-to-refresh can use the same method.
+  Future<void> _reload() async {
+    final next = TimetableWeekData.load(_selectedDay);
+    setState(() => _future = next);
+    await next;
+  }
+
+  void _selectDay(DateTime day) => setState(() => _selectedDay = day);
+
+  void _shiftWeek(int deltaWeeks) {
+    setState(() {
+      _selectedDay = _selectedDay.add(Duration(days: 7 * deltaWeeks));
+      _future = TimetableWeekData.load(_selectedDay);
+    });
+  }
+
+  PastelHue _hueFor(int colorValue) {
+    if (colorValue == AppColors.accentGreenStrong.value) return PastelHue.green;
+    if (colorValue == AppColors.accentBlueStrong.value) return PastelHue.blue;
+    return PastelHue.purple;
+  }
+
+  Future<void> _openCreate() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AddEditSessionScreen(initialDate: _selectedDay),
+      ),
+    );
+    if (saved == true) _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final weekStart = startOfWeek(_selectedDay);
+
+    final content = Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Timetable', style: Theme.of(context).textTheme.headlineSmall),
+              IconButton(
+                icon: const Icon(Icons.add_circle_rounded, size: 28),
+                tooltip: 'Plan a session',
+                onPressed: _openCreate,
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                tooltip: 'Previous week',
+                onPressed: () => _shiftWeek(-1),
+              ),
+              Text(
+                _weekRangeLabel(weekStart),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                tooltip: 'Next week',
+                onPressed: () => _shiftWeek(1),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _DaySelector(
+            weekStart: weekStart,
+            selectedDay: _selectedDay,
+            onSelect: _selectDay,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Expanded(
+            child: AsyncBuilder<TimetableWeekData>(
+              future: _future,
+              errorMessage: 'Could not load your timetable.',
+              onRetry: _reload,
+              builder: (context, week) {
+                final sessions = week.forDay(_selectedDay);
+
+                if (sessions.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: _reload,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: 240,
+                          child: Center(
+                            child: Text(
+                              'No sessions this day — tap + to plan one.',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return RefreshIndicator(
+                  onRefresh: _reload,
+                  child: ListView.builder(
+                  itemCount: sessions.length,
+                  itemBuilder: (context, index) {
+                    final session = sessions[index];
+                    final subject = week.subjectsById[session.subjectId];
+                    final topic = session.topicId != null ? week.topicsById[session.topicId] : null;
+
+                    return TimelineEventCard(
+                      timeRange: '${formatTimeOfDay(session.startTime)} - ${formatTimeOfDay(session.endTime)}',
+                      title: subject?.name ?? 'Unknown subject',
+                      subtitle: topic?.name ?? 'Study session',
+                      meta: session.complete ? 'Completed' : 'Planned',
+                      hue: subject != null ? _hueFor(subject.colorValue) : PastelHue.blue,
+                      isLast: index == sessions.length - 1,
+                      onTap: () async {
+                        final changed = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => AddEditSessionScreen(existing: session),
+                          ),
+                        );
+                        if (changed == true) _reload();
+                      },
+                    );
+                  },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!widget.standalone) return content;
+
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(title: const Text('Timetable'), leading: const BackButton()),
+              Expanded(child: content),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _weekRangeLabel(DateTime weekStart) {
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    final month = months[weekStart.month - 1];
+    return 'Week • $month ${weekStart.day}–${weekEnd.day}';
+  }
+}
+
+class _DaySelector extends StatelessWidget {
+  final DateTime weekStart;
+  final DateTime selectedDay;
+  final ValueChanged<DateTime> onSelect;
+
+  const _DaySelector({
+    required this.weekStart,
+    required this.selectedDay,
+    required this.onSelect,
+  });
+
+  static const _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(7, (i) {
+        final day = weekStart.add(Duration(days: i));
+        final selected = isSameDay(day, selectedDay);
+        final isToday = isSameDay(day, DateTime.now());
+
+        return GestureDetector(
+          onTap: () => onSelect(day),
+          child: Column(
+            children: [
+              Text(
+                _labels[i],
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.accentPurpleStrong : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: isToday && !selected
+                      ? Border.all(color: AppColors.accentPurpleStrong, width: 1.5)
+                      : null,
+                ),
+                child: Text(
+                  '${day.day}',
+                  style: TextStyle(
+                    color: selected ? Colors.white : context.primaryText,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}
+
+===== FILE: .\lib\screens\timetable\timetable_view_data.dart =====
+import '../../models/study_session.dart';
+import '../../models/subject.dart';
+import '../../models/topic.dart';
+import '../../repositories/session_repository.dart';
+import '../../repositories/subject_repository.dart';
+import '../../repositories/topic_repository.dart';
+import '../../utils/date_utils.dart';
+
+/// A week's worth of sessions plus lookup maps, so the Timetable
+/// screen can switch days without re-hitting the database each time.
+class TimetableWeekData {
+  final List<StudySession> sessions;
+  final Map<String, Subject> subjectsById;
+  final Map<String, Topic> topicsById;
+
+  const TimetableWeekData({
+    required this.sessions,
+    required this.subjectsById,
+    required this.topicsById,
+  });
+
+  List<StudySession> forDay(DateTime day) {
+    final list = sessions.where((s) => isSameDay(s.scheduledDate, day)).toList();
+    list.sort((a, b) => a.startTime.compareTo(b.startTime));
+    return list;
+  }
+
+  static Future<TimetableWeekData> load(DateTime anyDayInWeek) async {
+    final sessionRepo = SessionRepository();
+    final subjectRepo = SubjectRepository();
+    final topicRepo = TopicRepository();
+
+    final start = startOfWeek(anyDayInWeek);
+    final end = endOfWeek(anyDayInWeek);
+
+    final sessions = await sessionRepo.getForRange(start, end);
+    final subjects = await subjectRepo.getAll();
+    final subjectsById = {for (final s in subjects) s.id: s};
+
+    final topicsById = <String, Topic>{};
+    for (final subject in subjects) {
+      final topics = await topicRepo.getForSubject(subject.id);
+      for (final topic in topics) {
+        topicsById[topic.id] = topic;
+      }
+    }
+
+    return TimetableWeekData(
+      sessions: sessions,
+      subjectsById: subjectsById,
+      topicsById: topicsById,
+    );
+  }
+}
+
+===== FILE: .\lib\services\database_service.dart =====
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+import 'sync_schema.dart';
+
+/// Owns the single sqflite Database instance and schema. Screens never
+/// touch this directly — they go through the repositories in
+/// lib/repositories/, which call DatabaseService.instance.database.
+class DatabaseService {
+  DatabaseService._internal();
+  static final DatabaseService instance = DatabaseService._internal();
+
+  static const _dbName = 'study_architect.db';
+  static const _dbVersion = 2;
+
+  Database? _db;
+
+  Future<Database> get database async {
+    _db ??= await _open();
+    return _db!;
+  }
+
+  Future<Database> _open() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, _dbName);
+    return openDatabase(
+      path,
+      version: _dbVersion,
+      onCreate: (db, version) async {
+        await _createSchema(db, version);
+        await applySyncSchema(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await applySyncSchema(db);
+      },
+      // sqflite does not enforce foreign keys by default — turn them on
+      // so the ON DELETE CASCADE / SET NULL rules above actually run.
+      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+    );
+  }
+
+  Future<void> _createSchema(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE students (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        school TEXT NOT NULL,
+        program TEXT NOT NULL,
+        level TEXT NOT NULL,
+        dailyGoalMinutes INTEGER NOT NULL,
+        weeklyGoalMinutes INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE subjects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        difficulty TEXT NOT NULL,
+        colorValue INTEGER NOT NULL,
+        weeklyTargetMinutes INTEGER NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE topics (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE study_sessions (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        topicId TEXT,
+        scheduledDate TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT NOT NULL,
+        actualDuration INTEGER,
+        status TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        rating INTEGER,
+        complete INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        subjectId TEXT NOT NULL,
+        topicId TEXT,
+        dueDate TEXT NOT NULL,
+        type TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        completed INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE settings (
+        id INTEGER PRIMARY KEY CHECK (id = 0),
+        notificationsEnabled INTEGER NOT NULL DEFAULT 1,
+        themeMode TEXT NOT NULL DEFAULT 'system'
+      )
+    ''');
+  }
+
+  /// Wipes every table but keeps the schema — used by the
+  /// "Clear All Data" danger-zone action in Step 14.
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('tasks');
+    await db.delete('study_sessions');
+    await db.delete('topics');
+    await db.delete('subjects');
+    await db.delete('students');
+    await db.delete('settings');
+  }
+
+  /// Full replace restore from a parsed backup JSON (see
+  /// BackupService for the schema). Deletes everything currently
+  /// stored, then inserts every row from the backup directly —
+  /// bypassing repository-level validation (e.g. StudySession's
+  /// end-after-start check) since this is trusted historical data
+  /// that was valid when it was first saved.
+  Future<void> restoreFromBackup({
+    Map<String, dynamic>? student,
+    Map<String, dynamic>? settings,
+    required List<Map<String, dynamic>> subjects,
+    required List<Map<String, dynamic>> topics,
+    required List<Map<String, dynamic>> sessions,
+    required List<Map<String, dynamic>> tasks,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('tasks');
+      await txn.delete('study_sessions');
+      await txn.delete('topics');
+      await txn.delete('subjects');
+      await txn.delete('students');
+      await txn.delete('settings');
+
+      if (student != null) {
+        await txn.insert('students', student);
+      }
+      if (settings != null) {
+        await txn.insert('settings', {...settings, 'id': 0});
+      }
+      for (final row in subjects) {
+        await txn.insert('subjects', row);
+      }
+      for (final row in topics) {
+        await txn.insert('topics', row);
+      }
+      for (final row in sessions) {
+        await txn.insert('study_sessions', row);
+      }
+      for (final row in tasks) {
+        await txn.insert('tasks', row);
+      }
+    });
+  }
+}
+
+===== FILE: .\lib\services\sync_service.dart =====
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/data_refresh_bus.dart';
+import 'database_service.dart';
+
+class _SyncTable {
+  final String name;
+
+  /// settings uses an INTEGER id locally; the cloud stores ids as text.
+  final bool intId;
+  const _SyncTable(this.name, {this.intId = false});
+}
+
+// Parents first, so children never arrive before the row they reference.
+const _tables = [
+  _SyncTable('students'),
+  _SyncTable('settings', intId: true),
+  _SyncTable('subjects'),
+  _SyncTable('topics'),
+  _SyncTable('study_sessions'),
+  _SyncTable('tasks'),
+];
+
+/// UTC ISO-8601 with millisecond precision — the same shape SQLite writes,
+/// so plain string comparison orders timestamps correctly.
+String _iso(DateTime d) => DateTime.fromMillisecondsSinceEpoch(
+      d.millisecondsSinceEpoch,
+      isUtc: true,
+    ).toIso8601String();
+
+class SyncService {
+  SyncService._();
+  static final SyncService instance = SyncService._();
+
+  static const _pageSize = 500;
+
+  SupabaseClient get _client => Supabase.instance.client;
+
+  bool _running = false;
+  bool _runAgain = false;
+  Timer? _debounce;
+  Timer? _poller;
+  RealtimeChannel? _channel;
+  StreamSubscription<AuthState>? _authSub;
+
+  /// Call once after Supabase.initialize().
+  Future<void> start() async {
+    await _authSub?.cancel();
+    _authSub = _client.auth.onAuthStateChange.listen((state) {
+      if (state.session != null) {
+        _subscribeRealtime();
+        scheduleSync();
+      } else {
+        _unsubscribeRealtime();
+      }
+    });
+
+    // Picks up local edits (repositories don't notify the sync layer).
+    _poller ??= Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => scheduleSync(),
+    );
+
+    if (_client.auth.currentUser != null) {
+      _subscribeRealtime();
+      scheduleSync();
+    }
+  }
+
+  void stop() {
+    _poller?.cancel();
+    _poller = null;
+    _debounce?.cancel();
+    _authSub?.cancel();
+    _unsubscribeRealtime();
+  }
+
+  /// Debounced: many quick calls collapse into one sync.
+  void scheduleSync() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(seconds: 2), syncNow);
+  }
+
+  Future<void> syncNow() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+    if (_running) {
+      _runAgain = true;
+      return;
+    }
+    _running = true;
+    try {
+      final changed = await _pull(user.id); // cloud -> local
+      await _push(user.id); // local -> cloud
+      // Only when the pull actually changed local data, refresh every screen.
+      if (changed.isNotEmpty) {
+        DataRefreshBus.instance.notify(RefreshScope.all);
+      }
+    } catch (e) {
+      // Offline or server error: nothing is lost, the next run retries.
+      debugPrint('Sync failed: $e');
+    } finally {
+      _running = false;
+      if (_runAgain) {
+        _runAgain = false;
+        scheduleSync();
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- realtime
+
+  void _subscribeRealtime() {
+    _unsubscribeRealtime();
+    final channel = _client.channel('study-architect-sync');
+    for (final t in _tables) {
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: t.name,
+        callback: (_) => scheduleSync(),
+      );
+    }
+    channel.subscribe();
+    _channel = channel;
+  }
+
+  void _unsubscribeRealtime() {
+    final channel = _channel;
+    if (channel != null) _client.removeChannel(channel);
+    _channel = null;
+  }
+
+  // -------------------------------------------------------------------- meta
+
+  Future<String?> _getMeta(Database db, String key) async {
+    final rows = await db.query('sync_meta', where: 'key = ?', whereArgs: [key]);
+    return rows.isEmpty ? null : rows.first['value'] as String;
+  }
+
+  Future<void> _setMeta(Database db, String key, String value) {
+    return db.insert(
+      'sync_meta',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  // -------------------------------------------------------------------- pull
+
+  /// Downloads rows changed in the cloud since the last pull.
+  /// Returns the names of local tables that were modified.
+  Future<Set<String>> _pull(String uid) async {
+    final db = await DatabaseService.instance.database;
+    final touched = <String>{};
+
+    for (final t in _tables) {
+      final key = 'pull:$uid:${t.name}';
+      var cursor = await _getMeta(db, key);
+
+      while (true) {
+        final base = _client.from(t.name).select();
+        final rows = await (cursor == null ? base : base.gt('updatedAt', cursor))
+            .order('updatedAt', ascending: true)
+            .limit(_pageSize);
+
+        for (final raw in rows) {
+          final row = Map<String, dynamic>.from(raw);
+          try {
+            if (await _applyRemote(db, t, row)) touched.add(t.name);
+          } catch (e) {
+            debugPrint('Skipped ${t.name} row ${row['id']}: $e');
+          }
+          cursor = _iso(DateTime.parse(row['updatedAt'] as String));
+        }
+
+        if (cursor != null) await _setMeta(db, key, cursor);
+        if (rows.length < _pageSize) break;
+      }
+    }
+    return touched;
+  }
+
+  /// Applies one cloud row with last-write-wins. Returns true if the
+  /// local table changed.
+  Future<bool> _applyRemote(
+    Database db,
+    _SyncTable t,
+    Map<String, dynamic> remote,
+  ) async {
+    final id = remote['id'] as String;
+    final localId = t.intId ? int.parse(id) : id;
+    final remoteAt = _iso(DateTime.parse(remote['updatedAt'] as String));
+
+    final local = await db.query(
+      t.name,
+      columns: ['updatedAt'],
+      where: 'id = ?',
+      whereArgs: [localId],
+    );
+    final localAt = local.isEmpty ? null : local.first['updatedAt'] as String?;
+
+    // Local copy is newer or identical: keep it.
+    if (localAt != null && localAt.compareTo(remoteAt) >= 0) return false;
+
+    // Cloud row was deleted.
+    if (remote['deletedAt'] != null) {
+      await db.delete(t.name, where: 'id = ?', whereArgs: [localId]);
+      await db.delete(
+        'sync_tombstones',
+        where: 'tableName = ? AND rowId = ?',
+        whereArgs: [t.name, id],
+      );
+      return local.isNotEmpty;
+    }
+
+    // Deleted locally after the cloud version was written: keep it deleted.
+    final tomb = await db.query(
+      'sync_tombstones',
+      where: 'tableName = ? AND rowId = ?',
+      whereArgs: [t.name, id],
+    );
+    if (tomb.isNotEmpty &&
+        (tomb.first['deletedAt'] as String).compareTo(remoteAt) >= 0) {
+      return false;
+    }
+
+    final values = Map<String, dynamic>.from(remote)
+      ..remove('user_id')
+      ..remove('deletedAt')
+      ..['id'] = localId
+      ..['updatedAt'] = remoteAt;
+
+    if (local.isEmpty) {
+      await db.insert(t.name, values);
+    } else {
+      // update, not "insert or replace": REPLACE would delete the row first
+      // and cascade-delete its children.
+      await db.update(t.name, values, where: 'id = ?', whereArgs: [localId]);
+    }
+    return true;
+  }
+
+  // -------------------------------------------------------------------- push
+
+  Future<void> _push(String uid) async {
+    final db = await DatabaseService.instance.database;
+
+    // 1) New and edited rows.
+    for (final t in _tables) {
+      final key = 'push:$uid:${t.name}';
+      final since = await _getMeta(db, key);
+
+      final rows = await db.query(
+        t.name,
+        where: since == null ? null : 'updatedAt > ?',
+        whereArgs: since == null ? null : [since],
+        orderBy: 'updatedAt ASC',
+      );
+      if (rows.isEmpty) continue;
+
+      final payload = rows
+          .map((r) => <String, dynamic>{
+                ...r,
+                'id': r['id'].toString(),
+                'user_id': uid,
+                'deletedAt': null,
+              })
+          .toList();
+
+      for (var i = 0; i < payload.length; i += 200) {
+        final end = i + 200 > payload.length ? payload.length : i + 200;
+        await _client
+            .from(t.name)
+            .upsert(payload.sublist(i, end), onConflict: 'user_id,id');
+      }
+      await _setMeta(db, key, rows.last['updatedAt'] as String);
+    }
+
+    // 2) Deletes.
+    final tombstones = await db.query('sync_tombstones');
+    for (final tomb in tombstones) {
+      final table = tomb['tableName'] as String;
+      final rowId = tomb['rowId'] as String;
+      final at = tomb['deletedAt'] as String;
+
+      await _client
+          .from(table)
+          .update({'deletedAt': at, 'updatedAt': at})
+          .eq('user_id', uid)
+          .eq('id', rowId);
+
+      await db.delete(
+        'sync_tombstones',
+        where: 'tableName = ? AND rowId = ?',
+        whereArgs: [table, rowId],
+      );
+    }
+  }
+}
+
+===== FILE: .\lib\widgets\task_card.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+import 'pastel_card.dart';
+
+/// A single task tile, e.g. Home's "Computer networks / Laboratory
+/// work N1 / 3 days left" card.
+class TaskCard extends StatelessWidget {
+  final String subject;
+  final String title;
+  final String meta; // e.g. "3 days left" or "Until 09.18"
+  final PastelHue hue;
+  final bool completed;
+  final VoidCallback? onTap;
+
+  const TaskCard({
+    super.key,
+    required this.subject,
+    required this.title,
+    required this.meta,
+    required this.hue,
+    this.completed = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final strong = pastelStrong(hue);
+    return PastelCard(
+      hue: hue,
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            subject,
+            style: TextStyle(
+              fontSize: 11,
+              color: strong.withOpacity(0.85),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+              decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                completed ? Icons.check_circle_rounded : Icons.schedule_rounded,
+                size: 13,
+                color: strong,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                meta,
+                style: TextStyle(fontSize: 11, color: strong.withOpacity(0.85)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+===== FILE: .\pubspec.yaml =====
+name: study_architect
+description: "Study Architect — local-first Flutter study planner and tracker."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.2.1
+  sqflite: ^2.3.3
+  sqflite_common_ffi: ^2.4.3
+  path: ^1.9.0
+  uuid: ^4.6.0
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
+  file_picker: ^13.1.0
+  share_plus: ^13.3.0
+  path_provider: ^2.1.4
+  supabase_flutter: ^2.8.0
+  flutter_dotenv: ^5.2.1
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
+
+===== FILE: .\supabase\migrations\001_schema.sql =====
+-- =====================================================================
+-- Study Architect V2 — Step 2: Schema, RLS, Realtime
+-- =====================================================================
+
+-- ---------- Shared helper: server-authoritative updated_at ----------
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+-- ---------- profiles (1 row per auth user) ----------
+create table public.profiles (
+  id                   uuid primary key references auth.users(id) on delete cascade,
+  display_name         text not null default '',
+  institution          text,
+  study_level          text,
+  daily_goal_minutes   integer not null default 120 check (daily_goal_minutes between 0 and 1440),
+  avatar_url           text,
+  xp_total             integer not null default 0 check (xp_total >= 0),
+  level                integer not null default 1 check (level >= 1),
+  current_streak       integer not null default 0,
+  longest_streak       integer not null default 0,
+  last_study_date      date,
+  onboarding_done      boolean not null default false,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now()
+);
+
+-- ---------- user_settings ----------
+create table public.user_settings (
+  user_id              uuid primary key references auth.users(id) on delete cascade,
+  theme_mode           text not null default 'system' check (theme_mode in ('system','light','dark')),
+  notifications_on     boolean not null default true,
+  reminder_minutes     integer not null default 10,
+  week_starts_on       smallint not null default 1 check (week_starts_on between 0 and 6),
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now()
+);
+
+-- ---------- subjects ----------
+create table public.subjects (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  name                 text not null,
+  color_value          integer not null default 0,
+  weekly_target_min    integer not null default 0,
+  sort_order           integer not null default 0,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz
+);
+
+-- ---------- topics (ordered roadmap per subject) ----------
+create table public.topics (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  subject_id           uuid not null references public.subjects(id) on delete cascade,
+  title                text not null,
+  notes                text,
+  sort_order           integer not null default 0,
+  is_completed         boolean not null default false,
+  completed_at         timestamptz,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz
+);
+
+-- ---------- study_sessions (planned timetable entries) ----------
+create table public.study_sessions (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  subject_id           uuid references public.subjects(id) on delete set null,
+  topic_id             uuid references public.topics(id) on delete set null,
+  title                text not null default '',
+  start_at             timestamptz not null,
+  end_at               timestamptz not null,
+  recurrence           text not null default 'none' check (recurrence in ('none','weekly')),
+  recurrence_until     date,
+  status               text not null default 'planned' check (status in ('planned','completed','skipped')),
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz,
+  check (end_at > start_at)
+);
+
+-- ---------- study_logs (what actually happened: focus + manual logs) ----------
+create table public.study_logs (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  session_id           uuid references public.study_sessions(id) on delete set null,
+  subject_id           uuid references public.subjects(id) on delete set null,
+  topic_id             uuid references public.topics(id) on delete set null,
+  started_at           timestamptz not null,
+  duration_seconds     integer not null check (duration_seconds >= 0),
+  source               text not null default 'focus' check (source in ('focus','manual')),
+  mood                 smallint check (mood between 1 and 5),
+  notes                text,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz
+);
+
+-- ---------- tasks ----------
+create table public.tasks (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  subject_id           uuid references public.subjects(id) on delete set null,
+  title                text not null,
+  due_at               timestamptz,
+  priority             smallint not null default 1 check (priority between 0 and 2),
+  is_done              boolean not null default false,
+  done_at              timestamptz,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz
+);
+
+-- ---------- exams (NEW in V2) ----------
+create table public.exams (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  subject_id           uuid not null references public.subjects(id) on delete cascade,
+  title                text not null,
+  exam_at              timestamptz not null,
+  location             text,
+  notes                text,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz
+);
+
+-- ---------- exam_topics (prep checklist, NEW in V2) ----------
+create table public.exam_topics (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  exam_id              uuid not null references public.exams(id) on delete cascade,
+  topic_id             uuid not null references public.topics(id) on delete cascade,
+  is_prepared          boolean not null default false,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz,
+  unique (exam_id, topic_id)
+);
+
+-- ---------- achievements (unlocked badges, NEW in V2) ----------
+create table public.achievements (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  code                 text not null,
+  unlocked_at          timestamptz not null default now(),
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz,
+  unique (user_id, code)
+);
+
+-- ---------- xp_log (append-only XP ledger, NEW in V2) ----------
+create table public.xp_log (
+  id                   uuid primary key default gen_random_uuid(),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  amount               integer not null,
+  reason               text not null,
+  source_id            uuid,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  deleted_at           timestamptz
+);
+
+-- ---------- Indexes for incremental pull (user_id + updated_at) ----------
+create index idx_subjects_sync       on public.subjects       (user_id, updated_at);
+create index idx_topics_sync         on public.topics         (user_id, updated_at);
+create index idx_topics_subject      on public.topics         (subject_id, sort_order);
+create index idx_sessions_sync       on public.study_sessions (user_id, updated_at);
+create index idx_sessions_start      on public.study_sessions (user_id, start_at);
+create index idx_logs_sync           on public.study_logs     (user_id, updated_at);
+create index idx_logs_started        on public.study_logs     (user_id, started_at);
+create index idx_tasks_sync          on public.tasks          (user_id, updated_at);
+create index idx_exams_sync          on public.exams          (user_id, updated_at);
+create index idx_exam_topics_sync    on public.exam_topics    (user_id, updated_at);
+create index idx_achievements_sync   on public.achievements   (user_id, updated_at);
+create index idx_xp_log_sync         on public.xp_log         (user_id, updated_at);
+
+-- ---------- updated_at triggers + Row Level Security ----------
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'profiles','user_settings','subjects','topics','study_sessions','study_logs',
+    'tasks','exams','exam_topics','achievements','xp_log'
+  ]
+  loop
+    execute format(
+      'create trigger trg_%1$s_updated_at before update on public.%1$I
+         for each row execute function public.set_updated_at();', t);
+
+    execute format('alter table public.%I enable row level security;', t);
+
+    if t = 'profiles' then
+      execute 'create policy "profiles_select_own" on public.profiles for select using (auth.uid() = id);';
+      execute 'create policy "profiles_insert_own" on public.profiles for insert with check (auth.uid() = id);';
+      execute 'create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);';
+      execute 'create policy "profiles_delete_own" on public.profiles for delete using (auth.uid() = id);';
+    else
+      execute format('create policy "%1$s_select_own" on public.%1$I for select using (auth.uid() = user_id);', t);
+      execute format('create policy "%1$s_insert_own" on public.%1$I for insert with check (auth.uid() = user_id);', t);
+      execute format('create policy "%1$s_update_own" on public.%1$I for update using (auth.uid() = user_id) with check (auth.uid() = user_id);', t);
+      execute format('create policy "%1$s_delete_own" on public.%1$I for delete using (auth.uid() = user_id);', t);
+    end if;
+  end loop;
+end;
+$$;
+
+-- ---------- Auto-create profile + settings on sign-up ----------
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, display_name)
+  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', ''))
+  on conflict (id) do nothing;
+
+  insert into public.user_settings (user_id)
+  values (new.id)
+  on conflict (user_id) do nothing;
+
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ---------- Realtime (feeds DataRefreshBus in Step 4) ----------
+alter publication supabase_realtime add table
+  public.profiles, public.subjects, public.topics, public.study_sessions,
+  public.study_logs, public.tasks, public.exams, public.exam_topics,
+  public.achievements, public.xp_log;

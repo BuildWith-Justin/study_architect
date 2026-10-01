@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'startup_decider.dart';
-import '../screens/plan/plan_session_screen.dart';
+import '../screens/timetable/plan_session_screen.dart';
 
 class AppRoutes {
   AppRoutes._();

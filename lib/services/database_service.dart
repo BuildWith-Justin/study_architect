@@ -11,7 +11,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'study_architect.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
 
   Database? _db;
 
@@ -32,11 +32,32 @@ class DatabaseService {
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await applySyncSchema(db);
+        if (oldVersion < 3) await _addSessionRecurrence(db);
       },
       // sqflite does not enforce foreign keys by default — turn them on
       // so the ON DELETE CASCADE / SET NULL rules above actually run.
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
     );
+  }
+
+  /// V2 Step 7: recurring sessions. Every weekly occurrence is stored as
+  /// its own row; these columns link the rows of one series together.
+  Future<void> _addSessionRecurrence(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(study_sessions)');
+    final existing = info.map((c) => c['name'] as String).toSet();
+    if (!existing.contains('recurrence')) {
+      await db.execute(
+        "ALTER TABLE study_sessions ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'",
+      );
+    }
+    if (!existing.contains('recurrenceUntil')) {
+      await db.execute(
+        'ALTER TABLE study_sessions ADD COLUMN recurrenceUntil TEXT',
+      );
+    }
+    if (!existing.contains('seriesId')) {
+      await db.execute('ALTER TABLE study_sessions ADD COLUMN seriesId TEXT');
+    }
   }
 
   Future<void> _createSchema(Database db, int version) async {
@@ -86,6 +107,9 @@ class DatabaseService {
         notes TEXT NOT NULL DEFAULT '',
         rating INTEGER,
         complete INTEGER NOT NULL DEFAULT 0,
+        recurrence TEXT NOT NULL DEFAULT 'none',
+        recurrenceUntil TEXT,
+        seriesId TEXT,
         FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
         FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
       )

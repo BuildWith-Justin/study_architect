@@ -7,6 +7,17 @@ SessionStatus statusFromString(String value) {
   );
 }
 
+/// V2 Step 7: how a session repeats. Every occurrence of a repeating
+/// session is stored as its own row; rows of one series share a seriesId.
+enum SessionRecurrence { none, weekly }
+
+SessionRecurrence recurrenceFromString(String value) {
+  return SessionRecurrence.values.firstWhere(
+    (r) => r.name == value,
+    orElse: () => SessionRecurrence.none,
+  );
+}
+
 class StudySession {
   final String id;
   final String subjectId;
@@ -19,6 +30,9 @@ class StudySession {
   final String notes;
   final int? rating; // 1-5, optional, set at session end
   final bool complete;
+  final SessionRecurrence recurrence;
+  final DateTime? recurrenceUntil; // last day of the series (inclusive)
+  final String? seriesId; // shared by every occurrence of one series
 
   const StudySession({
     required this.id,
@@ -32,11 +46,17 @@ class StudySession {
     this.notes = '',
     this.rating,
     this.complete = false,
+    this.recurrence = SessionRecurrence.none,
+    this.recurrenceUntil,
+    this.seriesId,
   });
 
   /// Business rule: a session cannot be saved with an end time earlier
   /// than or equal to its start time.
   bool get isTimeRangeValid => endTime.isAfter(startTime);
+
+  /// True when this session is one occurrence of a repeating series.
+  bool get isRecurring => seriesId != null;
 
   StudySession copyWith({
     String? id,
@@ -50,6 +70,9 @@ class StudySession {
     String? notes,
     int? rating,
     bool? complete,
+    SessionRecurrence? recurrence,
+    DateTime? recurrenceUntil,
+    String? seriesId,
   }) {
     return StudySession(
       id: id ?? this.id,
@@ -63,6 +86,9 @@ class StudySession {
       notes: notes ?? this.notes,
       rating: rating ?? this.rating,
       complete: complete ?? this.complete,
+      recurrence: recurrence ?? this.recurrence,
+      recurrenceUntil: recurrenceUntil ?? this.recurrenceUntil,
+      seriesId: seriesId ?? this.seriesId,
     );
   }
 
@@ -78,6 +104,9 @@ class StudySession {
         'notes': notes,
         'rating': rating,
         'complete': complete ? 1 : 0,
+        'recurrence': recurrence.name,
+        'recurrenceUntil': recurrenceUntil?.toIso8601String(),
+        'seriesId': seriesId,
       };
 
   factory StudySession.fromMap(Map<String, dynamic> map) => StudySession(
@@ -92,5 +121,11 @@ class StudySession {
         notes: map['notes'] as String? ?? '',
         rating: map['rating'] as int?,
         complete: (map['complete'] as int) == 1,
+        // Older rows and older backups have no recurrence columns.
+        recurrence: recurrenceFromString(map['recurrence'] as String? ?? 'none'),
+        recurrenceUntil: map['recurrenceUntil'] == null
+            ? null
+            : DateTime.parse(map['recurrenceUntil'] as String),
+        seriesId: map['seriesId'] as String?,
       );
 }

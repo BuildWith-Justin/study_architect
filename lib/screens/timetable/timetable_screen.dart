@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../core/data_refresh_bus.dart';
+import '../../core/refreshable_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
-// ignore: unused_import
-import '../../models/subject.dart';
 import '../../widgets/timeline_event_card.dart';
 import '../../widgets/pastel_card.dart';
 import '../../widgets/async_builder.dart';
@@ -26,31 +26,76 @@ class TimetableScreen extends StatefulWidget {
   State<TimetableScreen> createState() => _TimetableScreenState();
 }
 
-class _TimetableScreenState extends State<TimetableScreen> {
+class _TimetableScreenState extends State<TimetableScreen>
+    with RefreshableScreenMixin<TimetableScreen> {
   late DateTime _selectedDay;
   late Future<TimetableWeekData> _future;
 
+  /// Last week of data that finished loading. Only used to draw the
+  /// small "has sessions" dots under the day selector.
+  TimetableWeekData? _loadedData;
+  DateTime? _loadedWeekStart;
+
+  /// Data scopes that make this screen reload itself automatically.
+  @override
+  List<RefreshScope> get watchedScopes => [
+        RefreshScope.sessions,
+        RefreshScope.subjects,
+      ];
+
   @override
   void initState() {
-    super.initState();
+    super.initState(); // RefreshableScreenMixin subscribes to the bus here.
     _selectedDay = startOfDay(DateTime.now());
-    _future = TimetableWeekData.load(_selectedDay);
+    _future = _load();
   }
 
-  /// Awaitable so both manual reload-after-edit calls and
-  /// pull-to-refresh can use the same method.
-  Future<void> _reload() async {
-    final next = TimetableWeekData.load(_selectedDay);
+  /// Loads the week that contains [_selectedDay] and remembers it for
+  /// the day dots, but only if that week is still the one on screen.
+  Future<TimetableWeekData> _load() {
+    final weekStart = startOfWeek(_selectedDay);
+    return TimetableWeekData.load(_selectedDay).then((data) {
+      if (mounted && startOfWeek(_selectedDay) == weekStart) {
+        setState(() {
+          _loadedData = data;
+          _loadedWeekStart = weekStart;
+        });
+      }
+      return data;
+    });
+  }
+
+  /// Used by pull-to-refresh, the retry button, the DataRefreshBus
+  /// (a session was saved, deleted or synced) and "Today".
+  @override
+  Future<void> onRefresh() async {
+    if (!mounted) return;
+    final next = _load();
     setState(() => _future = next);
-    await next;
+    try {
+      await next;
+    } catch (_) {
+      // AsyncBuilder shows the error state with a retry button.
+    }
   }
 
   void _selectDay(DateTime day) => setState(() => _selectedDay = day);
 
   void _shiftWeek(int deltaWeeks) {
     setState(() {
-      _selectedDay = _selectedDay.add(Duration(days: 7 * deltaWeeks));
-      _future = TimetableWeekData.load(_selectedDay);
+      _selectedDay = DateTime(
+        _selectedDay.year,
+        _selectedDay.month,
+        _selectedDay.day + 7 * deltaWeeks,
+      );
+      _future = _load();
+    });
+  }
+
+  void _goToToday() {
+    setState(() {
+      _selectedDay = startOfDay(DateTime.now());
+      _future = _load();
     });
   }
 
@@ -60,18 +105,29 @@ class _TimetableScreenState extends State<TimetableScreen> {
     return PastelHue.purple;
   }
 
+  /// True when the week on screen has at least one session on [day].
+  bool _hasSessionsOn(DateTime day) {
+    final data = _loadedData;
+    if (data == null) return false;
+    if (_loadedWeekStart != startOfWeek(day)) return false;
+    return data.forDay(day).isNotEmpty;
+  }
+
   Future<void> _openCreate() async {
-    final saved = await Navigator.of(context).push<bool>(
+    // The session form notifies DataRefreshBus on save, which reloads
+    // this screen through RefreshableScreenMixin.
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => AddEditSessionScreen(initialDate: _selectedDay),
       ),
     );
-    if (saved == true) _reload();
   }
 
   @override
   Widget build(BuildContext context) {
     final weekStart = startOfWeek(_selectedDay);
+    final isOnToday = isSameDay(_selectedDay, DateTime.now());
+    final bottomPadding = widget.standalone ? 24.0 : 96.0;
 
     final content = Padding(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -83,7 +139,11 @@ class _TimetableScreenState extends State<TimetableScreen> {
             children: [
               Text('Timetable', style: Theme.of(context).textTheme.headlineSmall),
               IconButton(
-                icon: const Icon(Icons.add_circle_rounded, size: 28),
+                icon: const Icon(
+                  Icons.add_circle_rounded,
+                  size: 28,
+                  color: AppColors.primary,
+                ),
                 tooltip: 'Plan a session',
                 onPressed: _openCreate,
               ),
@@ -96,15 +156,32 @@ class _TimetableScreenState extends State<TimetableScreen> {
                 tooltip: 'Previous week',
                 onPressed: () => _shiftWeek(-1),
               ),
-              Text(
-                _weekRangeLabel(weekStart),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              Flexible(
+                child: Text(
+                  _weekRangeLabel(weekStart),
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: context.secondaryText,
+                      ),
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
                 tooltip: 'Next week',
                 onPressed: () => _shiftWeek(1),
               ),
+              const Spacer(),
+              if (!isOnToday)
+                TextButton(
+                  onPressed: _goToToday,
+                  child: const Text(
+                    'Today',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -112,19 +189,19 @@ class _TimetableScreenState extends State<TimetableScreen> {
             weekStart: weekStart,
             selectedDay: _selectedDay,
             onSelect: _selectDay,
+            hasSessions: _hasSessionsOn,
           ),
           const SizedBox(height: AppSpacing.lg),
           Expanded(
             child: AsyncBuilder<TimetableWeekData>(
               future: _future,
               errorMessage: 'Could not load your timetable.',
-              onRetry: _reload,
+              onRetry: onRefresh,
               builder: (context, week) {
                 final sessions = week.forDay(_selectedDay);
 
                 if (sessions.isEmpty) {
-                  return RefreshIndicator(
-                    onRefresh: _reload,
+                  return buildRefreshable(
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
@@ -133,7 +210,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
                           child: Center(
                             child: Text(
                               'No sessions this day — tap + to plan one.',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: context.secondaryText),
                             ),
                           ),
                         ),
@@ -142,32 +222,43 @@ class _TimetableScreenState extends State<TimetableScreen> {
                   );
                 }
 
-                return RefreshIndicator(
-                  onRefresh: _reload,
+                return buildRefreshable(
                   child: ListView.builder(
-                  itemCount: sessions.length,
-                  itemBuilder: (context, index) {
-                    final session = sessions[index];
-                    final subject = week.subjectsById[session.subjectId];
-                    final topic = session.topicId != null ? week.topicsById[session.topicId] : null;
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(bottom: bottomPadding),
+                    itemCount: sessions.length,
+                    itemBuilder: (context, index) {
+                      final session = sessions[index];
+                      final subject = week.subjectsById[session.subjectId];
+                      final topic = session.topicId != null
+                          ? week.topicsById[session.topicId]
+                          : null;
 
-                    return TimelineEventCard(
-                      timeRange: '${formatTimeOfDay(session.startTime)} - ${formatTimeOfDay(session.endTime)}',
-                      title: subject?.name ?? 'Unknown subject',
-                      subtitle: topic?.name ?? 'Study session',
-                      meta: session.complete ? 'Completed' : 'Planned',
-                      hue: subject != null ? _hueFor(subject.colorValue) : PastelHue.blue,
-                      isLast: index == sessions.length - 1,
-                      onTap: () async {
-                        final changed = await Navigator.of(context).push<bool>(
-                          MaterialPageRoute(
-                            builder: (_) => AddEditSessionScreen(existing: session),
-                          ),
-                        );
-                        if (changed == true) _reload();
-                      },
-                    );
-                  },
+                      final status =
+                          session.complete ? 'Completed' : 'Planned';
+
+                      return TimelineEventCard(
+                        timeRange:
+                            '${formatTimeOfDay(session.startTime)} - ${formatTimeOfDay(session.endTime)}',
+                        title: subject?.name ?? 'Unknown subject',
+                        subtitle: topic?.name ?? 'Study session',
+                        meta: session.isRecurring ? '$status · Weekly' : status,
+                        hue: subject != null
+                            ? _hueFor(subject.colorValue)
+                            : PastelHue.blue,
+                        isLast: index == sessions.length - 1,
+                        onTap: () async {
+                          // The session form notifies DataRefreshBus on
+                          // save/delete, which reloads this screen.
+                          await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AddEditSessionScreen(existing: session),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
                 );
               },
@@ -199,8 +290,20 @@ class _TimetableScreenState extends State<TimetableScreen> {
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December',
     ];
-    final month = months[weekStart.month - 1];
-    return 'Week • $month ${weekStart.day}–${weekEnd.day}';
+    const shortMonths = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+
+    if (weekStart.month == weekEnd.month) {
+      final month = months[weekStart.month - 1];
+      return 'Week • $month ${weekStart.day}–${weekEnd.day}';
+    }
+
+    // The week crosses two months, e.g. "Sep 28 – Oct 4".
+    final startMonth = shortMonths[weekStart.month - 1];
+    final endMonth = shortMonths[weekEnd.month - 1];
+    return 'Week • $startMonth ${weekStart.day} – $endMonth ${weekEnd.day}';
   }
 }
 
@@ -208,11 +311,13 @@ class _DaySelector extends StatelessWidget {
   final DateTime weekStart;
   final DateTime selectedDay;
   final ValueChanged<DateTime> onSelect;
+  final bool Function(DateTime day) hasSessions;
 
   const _DaySelector({
     required this.weekStart,
     required this.selectedDay,
     required this.onSelect,
+    required this.hasSessions,
   });
 
   static const _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -222,17 +327,22 @@ class _DaySelector extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(7, (i) {
-        final day = weekStart.add(Duration(days: i));
+        final day = DateTime(weekStart.year, weekStart.month, weekStart.day + i);
         final selected = isSameDay(day, selectedDay);
         final isToday = isSameDay(day, DateTime.now());
+        final busy = hasSessions(day);
 
         return GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => onSelect(day),
           child: Column(
             children: [
               Text(
                 _labels[i],
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.secondaryText,
+                      fontWeight: isToday ? FontWeight.w700 : FontWeight.w400,
+                    ),
               ),
               const SizedBox(height: 4),
               Container(
@@ -240,10 +350,10 @@ class _DaySelector extends StatelessWidget {
                 height: 32,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.accentPurpleStrong : Colors.transparent,
+                  color: selected ? AppColors.primary : Colors.transparent,
                   shape: BoxShape.circle,
                   border: isToday && !selected
-                      ? Border.all(color: AppColors.accentPurpleStrong, width: 1.5)
+                      ? Border.all(color: AppColors.primary, width: 1.5)
                       : null,
                 ),
                 child: Text(
@@ -252,6 +362,15 @@ class _DaySelector extends StatelessWidget {
                     color: selected ? Colors.white : context.primaryText,
                     fontWeight: FontWeight.w500,
                   ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: busy ? AppColors.teal : Colors.transparent,
                 ),
               ),
             ],

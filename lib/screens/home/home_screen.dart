@@ -209,9 +209,13 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
-                      child: StatCard(
-                        label: 'Tasks today',
-                        value: '${data.tasksTodayCount}',
+                      child: GestureDetector(
+                        onTap: () => _openScreen(const TasksScreen()),
+                        child: StatCard(
+                          label: 'Tasks today',
+                          value: '${data.tasksTodayCount}',
+                          showsTapAffordance: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
