@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import '../timetable/add_edit_session_screen.dart';
+import '../session/create_session_screen.dart';
 
-/// Pushed when the "+" nav item is tapped. Just forwards to the real
-/// session form — kept as its own file/route in case the "+" flow
-/// ever needs its own wrapper (e.g. picking Session vs Task) later.
+/// Pushed when the "+" nav item is tapped (route /plan).
+/// V2 Step 8a: shows the Create Session screen, which offers
+/// "Start focus now" or "Schedule for later" (the Step 7b form,
+/// unchanged).
 class PlanSessionScreen extends StatelessWidget {
   const PlanSessionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const AddEditSessionScreen();
+    return const CreateSessionScreen();
   }
 }
