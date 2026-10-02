@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/refreshable_screen.dart'; // <- use the real filename, see note below
+import '../../core/data_refresh_bus.dart';
+import '../../core/refreshable_screen.dart';
 import '../../models/subject.dart';
 import '../../models/topic.dart';
 import '../../models/study_session.dart';
@@ -14,7 +15,7 @@ import '../../utils/date_utils.dart';
 import '../../widgets/gradient_background.dart';
 import '../../widgets/app_buttons.dart';
 import '../../widgets/async_builder.dart';
-import '../../widgets/topic_row.dart';
+import '../../widgets/roadmap_topic_tile.dart';
 import '../session/focus_timer_screen.dart';
 import 'add_edit_subject_screen.dart';
 
@@ -37,6 +38,11 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   final _sessionRepo = SessionRepository();
 
   late Future<_DetailData> _future;
+
+  /// Topic ids in the order the person just dragged them to. Shown
+  /// immediately so the list does not jump back while the new order is
+  /// being saved; cleared once the reload from the database is done.
+  List<String>? _pendingOrder;
 
   @override
   void initState() {
@@ -105,8 +111,40 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   @override
   Future<void> onRefresh() => _refresh();
 
-  Future<void> _addTopic(BuildContext context) async {
-    final controller = TextEditingController();
+  /// Tells the other screens (for example the Subjects list underneath
+  /// this one) that subject or topic data changed.
+  void _notifyChanged() {
+    DataRefreshBus.instance.notify(RefreshScope.all);
+  }
+
+  /// Applies the not-yet-saved drag order on top of the loaded topics.
+  List<Topic> _ordered(List<Topic> topics) {
+    final pending = _pendingOrder;
+    if (pending == null) return topics;
+
+    final byId = {for (final t in topics) t.id: t};
+    final result = <Topic>[];
+    for (final id in pending) {
+      final topic = byId.remove(id);
+      if (topic != null) result.add(topic);
+    }
+    result.addAll(byId.values);
+    return result;
+  }
+
+  // --------------------------------------------------------------- topics
+
+  /// Asks for a topic name. Returns null if cancelled.
+  Future<String?> _promptTopicName({
+    required String title,
+    required String confirmLabel,
+    String initial = '',
+  }) async {
+    final controller = TextEditingController(text: initial);
+    controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: initial.length,
+    );
 
     TransitionRoute<dynamic>? dialogRoute;
 
@@ -116,13 +154,17 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         dialogRoute = ModalRoute.of(dialogContext);
 
         return AlertDialog(
-          title: const Text('New topic'),
+          title: Text(title),
           content: TextField(
             controller: controller,
             autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
               hintText: 'e.g. Differential Equations',
             ),
+            onSubmitted: (value) {
+              Navigator.pop(dialogContext, value.trim());
+            },
           ),
           actions: [
             TextButton(
@@ -136,7 +178,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                   controller.text.trim(),
                 );
               },
-              child: const Text('Add'),
+              child: Text(confirmLabel),
             ),
           ],
         );
@@ -151,6 +193,15 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
     controller.dispose();
 
+    return name;
+  }
+
+  Future<void> _addTopic() async {
+    final name = await _promptTopicName(
+      title: 'New topic',
+      confirmLabel: 'Add',
+    );
+
     if (name == null || name.isEmpty) return;
 
     await _topicRepo.create(
@@ -163,7 +214,25 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
     if (!mounted) return;
 
-    _reload();
+    await _refresh();
+    _notifyChanged();
+  }
+
+  Future<void> _renameTopic(Topic topic) async {
+    final name = await _promptTopicName(
+      title: 'Rename topic',
+      confirmLabel: 'Save',
+      initial: topic.name,
+    );
+
+    if (name == null || name.isEmpty || name == topic.name) return;
+
+    await _topicRepo.rename(topic.id, name);
+
+    if (!mounted) return;
+
+    await _refresh();
+    _notifyChanged();
   }
 
   Future<void> _toggleTopic(Topic topic) async {
@@ -174,16 +243,90 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
     if (!mounted) return;
 
-    _reload();
+    await _refresh();
+    _notifyChanged();
   }
 
   Future<void> _deleteTopic(Topic topic) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete topic?'),
+        content: Text(
+          '"${topic.name}" will be removed from the roadmap. '
+          'Sessions and tasks linked to it are kept but unlinked.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     await _topicRepo.delete(topic.id);
 
     if (!mounted) return;
 
-    _reload();
+    await _refresh();
+    _notifyChanged();
   }
+
+  Future<void> _onReorder(
+    List<Topic> current,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (newIndex == oldIndex) return;
+
+    final ids = current.map((t) => t.id).toList();
+    final moved = ids.removeAt(oldIndex);
+    ids.insert(newIndex, moved);
+
+    // 1) Instant feedback on screen.
+    setState(() {
+      _pendingOrder = ids;
+    });
+
+    // 2) Save to the database.
+    try {
+      await _topicRepo.reorder(ids);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _pendingOrder = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save the new order.')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    // 3) Reload from the database, then drop the temporary order.
+    await _refresh();
+
+    if (!mounted) return;
+
+    setState(() {
+      _pendingOrder = null;
+    });
+    _notifyChanged();
+  }
+
+  // -------------------------------------------------------------- subject
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -230,6 +373,195 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     Navigator.of(context).pop(true);
   }
 
+  // ------------------------------------------------------------ UI pieces
+
+  Widget _summaryCard(
+    BuildContext context, {
+    required Subject subject,
+    required Color accent,
+    required int topicCount,
+    required int completedTopics,
+    required int percent,
+    required int thisWeekMinutes,
+  }) {
+    final theme = Theme.of(context);
+    final targetMinutes = subject.weeklyTargetMinutes;
+    final weekProgress = targetMinutes <= 0
+        ? 0.0
+        : (thisWeekMinutes / targetMinutes).clamp(0.0, 1.0).toDouble();
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: context.cardSurfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Roadmap progress',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: context.secondaryText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '$percent%',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: topicCount == 0 ? 0 : percent / 100,
+              minHeight: 8,
+              backgroundColor: accent.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(accent),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '$completedTopics of $topicCount topics done',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: context.secondaryText,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'This week',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: context.secondaryText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '${formatDuration(thisWeekMinutes)} of ${targetMinutes ~/ 60}h',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: context.primaryText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: weekProgress,
+              minHeight: 8,
+              backgroundColor: accent.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _roadmapSection(
+    BuildContext context, {
+    required List<Topic> topics,
+    required Color accent,
+  }) {
+    final theme = Theme.of(context);
+    final nextIndex = topics.indexWhere((t) => !t.completed);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Study roadmap',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (topics.length > 1)
+                    Text(
+                      'Drag the handle to reorder  ·  tap a topic to rename',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: context.secondaryText,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(
+                Icons.add_circle_rounded,
+                color: AppColors.primary,
+              ),
+              tooltip: 'Add topic',
+              onPressed: _addTopic,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        if (topics.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: context.cardSurfaceAlt,
+              borderRadius: BorderRadius.circular(AppRadii.cardSmall),
+            ),
+            child: Text(
+              'No topics yet — tap + to add the first step of your roadmap.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: context.secondaryText,
+              ),
+            ),
+          )
+        else
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: topics.length,
+            onReorder: (oldIndex, newIndex) =>
+                _onReorder(topics, oldIndex, newIndex),
+            itemBuilder: (context, index) {
+              final topic = topics[index];
+
+              return RoadmapTopicTile(
+                key: ValueKey(topic.id),
+                index: index,
+                name: topic.name,
+                completed: topic.completed,
+                isNext: index == nextIndex,
+                accent: accent,
+                onChanged: (_) => _toggleTopic(topic),
+                onTap: () => _renameTopic(topic),
+                onDelete: () => _deleteTopic(topic),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------- build
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -241,13 +573,15 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             onRetry: _reload,
             builder: (context, data) {
               final subject = data.subject;
+              final accent = Color(subject.colorValue);
+              final topics = _ordered(data.topics);
 
               final completedTopics =
-                  data.topics.where((t) => t.completed).length;
+                  topics.where((t) => t.completed).length;
 
-              final percent = data.topics.isEmpty
+              final percent = topics.isEmpty
                   ? 0
-                  : ((completedTopics / data.topics.length) * 100).round();
+                  : ((completedTopics / topics.length) * 100).round();
 
               final weekStart = startOfWeek(DateTime.now());
               final weekEnd = endOfWeek(DateTime.now());
@@ -263,7 +597,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                         ) &&
                         s.scheduledDate.isBefore(weekEnd),
                   )
-                  .fold(
+                  .fold<int>(
                     0,
                     (sum, s) => sum + (s.actualDuration ?? 0),
                   );
@@ -281,8 +615,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                         icon: const Icon(Icons.edit_outlined),
                         tooltip: 'Edit subject',
                         onPressed: () async {
-                          final changed =
-                              await Navigator.of(context).push<bool>(
+                          await Navigator.of(context).push<bool>(
                             MaterialPageRoute(
                               builder: (_) => AddEditSubjectScreen(
                                 existing: subject,
@@ -292,13 +625,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
                           if (!mounted) return;
 
-                          if (changed == true) {
-                            _reload();
-                          } else {
-                            // Refresh anyway in case data changed
-                            // through another route or process.
-                            _reload();
-                          }
+                          // Refresh whether or not something was saved,
+                          // in case data changed through another route.
+                          await _refresh();
+                          _notifyChanged();
                         },
                       ),
                       IconButton(
@@ -313,126 +643,37 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                     child: RefreshIndicator(
                       onRefresh: _refresh,
                       child: ListView(
-                        physics:
-                            const AlwaysScrollableScrollPhysics(),
-                        padding:
-                            const EdgeInsets.all(AppSpacing.lg),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(AppSpacing.lg),
                         children: [
-                          Container(
-                            padding:
-                                const EdgeInsets.all(AppSpacing.lg),
-                            decoration: BoxDecoration(
-                              color: context.cardSurface,
-                              borderRadius:
-                                  BorderRadius.circular(
-                                AppRadii.card,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${data.topics.length} topics • weekly target ${subject.weeklyTargetMinutes ~/ 60}h',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color:
-                                            AppColors.textSecondary,
-                                      ),
-                                ),
-                                const SizedBox(
-                                  height: AppSpacing.sm,
-                                ),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '${formatDuration(thisWeekMinutes)} studied this week',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            fontWeight:
-                                                FontWeight.w500,
-                                          ),
-                                    ),
-                                    Text(
-                                      '$percent%',
-                                      style: TextStyle(
-                                        fontWeight:
-                                            FontWeight.w600,
-                                        color: Color(
-                                          subject.colorValue,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                          _summaryCard(
+                            context,
+                            subject: subject,
+                            accent: accent,
+                            topicCount: topics.length,
+                            completedTopics: completedTopics,
+                            percent: percent,
+                            thisWeekMinutes: thisWeekMinutes,
                           ),
-                          const SizedBox(
-                            height: AppSpacing.lg,
+                          const SizedBox(height: AppSpacing.lg),
+                          _roadmapSection(
+                            context,
+                            topics: topics,
+                            accent: accent,
                           ),
-                          Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Topics',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium,
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.add_circle_outline,
-                                ),
-                                tooltip: 'Add topic',
-                                onPressed: () =>
-                                    _addTopic(context),
-                              ),
-                            ],
-                          ),
-                          ...data.topics.map(
-                            (topic) => TopicRow(
-                              name: topic.name,
-                              completed: topic.completed,
-                              onChanged: (_) =>
-                                  _toggleTopic(topic),
-                              onDelete: () =>
-                                  _deleteTopic(topic),
-                            ),
-                          ),
-                          if (data.topics.isEmpty)
-                            Text(
-                              'No topics yet — add your first one above.',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color:
-                                        AppColors.textSecondary,
-                                  ),
-                            ),
-                          const SizedBox(
-                            height: AppSpacing.lg,
-                          ),
+                          const SizedBox(height: AppSpacing.lg),
                           Text(
                             'Recent Sessions',
                             style: Theme.of(context)
                                 .textTheme
-                                .titleMedium,
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(
                             height: AppSpacing.sm,
                           ),
                           ...completedSessions.take(5).map(
-                                (session) =>
-                                    _RecentSessionRow(
+                                (session) => _RecentSessionRow(
                                   session: session,
                                 ),
                               ),
@@ -443,8 +684,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                                   .textTheme
                                   .bodySmall
                                   ?.copyWith(
-                                    color:
-                                        AppColors.textSecondary,
+                                    color: context.secondaryText,
                                   ),
                             ),
                           const SizedBox(
@@ -455,12 +695,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                             onPressed: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      FocusTimerScreen(
+                                  builder: (_) => FocusTimerScreen(
                                     subjectId: subject.id,
                                     subjectName: subject.name,
-                                    subjectColorValue:
-                                        subject.colorValue,
+                                    subjectColorValue: subject.colorValue,
                                   ),
                                 ),
                               );
@@ -508,29 +746,23 @@ class _RecentSessionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final weekday =
-        _weekdayName(session.scheduledDate.weekday);
+    final weekday = _weekdayName(session.scheduledDate.weekday);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             weekday,
-            style:
-                Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
           Text(
             formatDuration(
               session.actualDuration ?? 0,
             ),
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(
-                  color: AppColors.textSecondary,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.secondaryText,
                 ),
           ),
         ],

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../core/refreshable_screen.dart'; // <- use the real filename, see note below
+import '../../core/refreshable_screen.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/subject_card.dart';
-import '../../widgets/pastel_card.dart';
-import 'subjects_view_data.dart';
+import '../../theme/theme_helpers.dart';
+import '../../widgets/app_buttons.dart';
+import '../../widgets/subject_list_tile.dart';
 import 'add_edit_subject_screen.dart';
 import 'subject_detail_screen.dart';
+import 'subjects_view_data.dart';
 
 class SubjectsScreen extends StatefulWidget {
   const SubjectsScreen({super.key});
@@ -58,18 +59,6 @@ class _SubjectsScreenState extends State<SubjectsScreen>
   @override
   Future<void> onRefresh() => _reload();
 
-  PastelHue _hueFor(int colorValue) {
-    if (colorValue == AppColors.accentGreenStrong.toARGB32()) {
-      return PastelHue.green;
-    }
-
-    if (colorValue == AppColors.accentBlueStrong.toARGB32()) {
-      return PastelHue.blue;
-    }
-
-    return PastelHue.purple;
-  }
-
   Future<void> _openAdd() async {
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -117,9 +106,10 @@ class _SubjectsScreenState extends State<SubjectsScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.error_outline_rounded,
                     size: 48,
+                    color: context.secondaryText,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
@@ -131,13 +121,17 @@ class _SubjectsScreenState extends State<SubjectsScreen>
                   Text(
                     'Please try again.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
+                          color: context.secondaryText,
                         ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   FilledButton.icon(
                     onPressed: _reload,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
                     icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Retry'),
                   ),
@@ -148,6 +142,9 @@ class _SubjectsScreenState extends State<SubjectsScreen>
         }
 
         final summaries = snapshot.data ?? [];
+        final countLabel = summaries.length == 1
+            ? '1 active subject'
+            : '${summaries.length} active subjects';
 
         return Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -162,22 +159,27 @@ class _SubjectsScreenState extends State<SubjectsScreen>
                     children: [
                       Text(
                         'Subjects',
-                        style: Theme.of(context).textTheme.headlineSmall,
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       Text(
-                        '${summaries.length} active subjects',
+                        countLabel,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
+                              color: context.secondaryText,
                             ),
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.add_circle_rounded,
-                      size: 28,
-                    ),
+                  IconButton.filled(
                     onPressed: _openAdd,
+                    tooltip: 'Add subject',
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.add_rounded),
                   ),
                 ],
               ),
@@ -190,17 +192,47 @@ class _SubjectsScreenState extends State<SubjectsScreen>
                           physics: const AlwaysScrollableScrollPhysics(),
                           children: [
                             SizedBox(
-                              height:
-                                  MediaQuery.of(context).size.height * 0.55,
+                              height: MediaQuery.of(context).size.height * 0.5,
                               child: Center(
-                                child: Text(
-                                  'No subjects yet — tap + to add one.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: AppColors.textSecondary,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.menu_book_rounded,
+                                      size: 40,
+                                      color: context.secondaryText,
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    Text(
+                                      'No subjects yet',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.xs),
+                                    Text(
+                                      'Add your first subject to start planning.',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: context.secondaryText,
+                                          ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    SizedBox(
+                                      width: 220,
+                                      child: PrimaryButton(
+                                        label: 'Add subject',
+                                        icon: Icons.add_rounded,
+                                        onPressed: _openAdd,
                                       ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -208,23 +240,21 @@ class _SubjectsScreenState extends State<SubjectsScreen>
                         )
                       : ListView.separated(
                           physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 24),
                           itemCount: summaries.length,
-                          separatorBuilder: (_, __) => const SizedBox(
-                            height: AppSpacing.sm,
-                          ),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: AppSpacing.sm),
                           itemBuilder: (context, index) {
                             final summary = summaries[index];
 
-                            return SubjectCard(
+                            return SubjectListTile(
                               name: summary.subject.name,
                               topicCount: summary.topicCount,
                               completionPercent: summary.completionPercent,
-                              hue: _hueFor(
-                                summary.subject.colorValue,
-                              ),
-                              onTap: () => _openDetail(
-                                summary.subject.id,
-                              ),
+                              weeklyTargetMinutes:
+                                  summary.subject.weeklyTargetMinutes,
+                              accent: Color(summary.subject.colorValue),
+                              onTap: () => _openDetail(summary.subject.id),
                             );
                           },
                         ),

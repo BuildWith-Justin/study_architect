@@ -1,0 +1,2349 @@
+
+===== lib\models\subject.dart =====
+
+enum SubjectDifficulty { easy, medium, hard }
+
+SubjectDifficulty difficultyFromString(String value) {
+  return SubjectDifficulty.values.firstWhere(
+    (d) => d.name == value,
+    orElse: () => SubjectDifficulty.medium,
+  );
+}
+
+class Subject {
+  final String id;
+  final String name;
+  final SubjectDifficulty difficulty;
+  final int colorValue; // ARGB int, e.g. AppColors.accentPurpleStrong.value
+  final int weeklyTargetMinutes;
+  final DateTime createdAt;
+
+  const Subject({
+    required this.id,
+    required this.name,
+    required this.difficulty,
+    required this.colorValue,
+    required this.weeklyTargetMinutes,
+    required this.createdAt,
+  });
+
+  Subject copyWith({
+    String? id,
+    String? name,
+    SubjectDifficulty? difficulty,
+    int? colorValue,
+    int? weeklyTargetMinutes,
+    DateTime? createdAt,
+  }) {
+    return Subject(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      difficulty: difficulty ?? this.difficulty,
+      colorValue: colorValue ?? this.colorValue,
+      weeklyTargetMinutes: weeklyTargetMinutes ?? this.weeklyTargetMinutes,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'difficulty': difficulty.name,
+        'colorValue': colorValue,
+        'weeklyTargetMinutes': weeklyTargetMinutes,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory Subject.fromMap(Map<String, dynamic> map) => Subject(
+        id: map['id'] as String,
+        name: map['name'] as String,
+        difficulty: difficultyFromString(map['difficulty'] as String),
+        colorValue: map['colorValue'] as int,
+        weeklyTargetMinutes: map['weeklyTargetMinutes'] as int,
+        createdAt: DateTime.parse(map['createdAt'] as String),
+      );
+}
+
+===== lib\models\topic.dart =====
+
+class Topic {
+  final String id;
+  final String subjectId;
+  final String name;
+  final bool completed;
+
+  const Topic({
+    required this.id,
+    required this.subjectId,
+    required this.name,
+    this.completed = false,
+  });
+
+  Topic copyWith({
+    String? id,
+    String? subjectId,
+    String? name,
+    bool? completed,
+  }) {
+    return Topic(
+      id: id ?? this.id,
+      subjectId: subjectId ?? this.subjectId,
+      name: name ?? this.name,
+      completed: completed ?? this.completed,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'subjectId': subjectId,
+        'name': name,
+        'completed': completed ? 1 : 0,
+      };
+
+  factory Topic.fromMap(Map<String, dynamic> map) => Topic(
+        id: map['id'] as String,
+        subjectId: map['subjectId'] as String,
+        name: map['name'] as String,
+        completed: (map['completed'] as int) == 1,
+      );
+}
+
+===== lib\repositories\subject_repository.dart =====
+
+import 'package:sqflite/sqflite.dart';
+import '../models/subject.dart';
+import '../services/database_service.dart';
+
+class SubjectRepository {
+  final _db = DatabaseService.instance;
+
+  Future<void> create(Subject subject) async {
+    final db = await _db.database;
+    await db.insert('subjects', subject.toMap());
+  }
+
+  Future<void> update(Subject subject) async {
+    final db = await _db.database;
+    await db.update(
+      'subjects',
+      subject.toMap(),
+      where: 'id = ?',
+      whereArgs: [subject.id],
+    );
+  }
+
+  /// Deletes the subject. Related topics/sessions/tasks cascade via
+  /// the foreign keys in DatabaseService — callers should warn the
+  /// user before calling this (business rule from the V1 spec).
+  Future<void> delete(String id) async {
+    final db = await _db.database;
+    await db.delete('subjects', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Subject?> getById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query('subjects', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    return Subject.fromMap(rows.first);
+  }
+
+  Future<List<Subject>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('subjects', orderBy: 'createdAt ASC');
+    return rows.map(Subject.fromMap).toList();
+  }
+
+  /// Counts topics + sessions + tasks tied to a subject, so the UI can
+  /// show "this will also delete N related items" before confirming.
+  Future<int> countRelatedRecords(String subjectId) async {
+    final db = await _db.database;
+    final topics = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM topics WHERE subjectId = ?',
+      [subjectId],
+    ));
+    final sessions = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM study_sessions WHERE subjectId = ?',
+      [subjectId],
+    ));
+    final tasks = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM tasks WHERE subjectId = ?',
+      [subjectId],
+    ));
+    return (topics ?? 0) + (sessions ?? 0) + (tasks ?? 0);
+  }
+}
+
+===== lib\repositories\topic_repository.dart =====
+
+import '../models/topic.dart';
+import '../services/database_service.dart';
+
+class TopicRepository {
+  final _db = DatabaseService.instance;
+
+  Future<void> create(Topic topic) async {
+    final db = await _db.database;
+    await db.insert('topics', topic.toMap());
+  }
+
+  Future<void> update(Topic topic) async {
+    final db = await _db.database;
+    await db.update('topics', topic.toMap(), where: 'id = ?', whereArgs: [topic.id]);
+  }
+
+  Future<void> delete(String id) async {
+    final db = await _db.database;
+    await db.delete('topics', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> setCompleted(String id, bool completed) async {
+    final db = await _db.database;
+    await db.update(
+      'topics',
+      {'completed': completed ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Topic>> getForSubject(String subjectId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'topics',
+      where: 'subjectId = ?',
+      whereArgs: [subjectId],
+    );
+    return rows.map(Topic.fromMap).toList();
+  }
+}
+
+===== lib\services\database_service.dart =====
+
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+import 'sync_schema.dart';
+
+/// Owns the single sqflite Database instance and schema. Screens never
+/// touch this directly — they go through the repositories in
+/// lib/repositories/, which call DatabaseService.instance.database.
+class DatabaseService {
+  DatabaseService._internal();
+  static final DatabaseService instance = DatabaseService._internal();
+
+  static const _dbName = 'study_architect.db';
+  static const _dbVersion = 3;
+
+  Database? _db;
+
+  Future<Database> get database async {
+    _db ??= await _open();
+    return _db!;
+  }
+
+  Future<Database> _open() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, _dbName);
+    return openDatabase(
+      path,
+      version: _dbVersion,
+      onCreate: (db, version) async {
+        await _createSchema(db, version);
+        await applySyncSchema(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await applySyncSchema(db);
+        if (oldVersion < 3) await _addSessionRecurrence(db);
+      },
+      // sqflite does not enforce foreign keys by default — turn them on
+      // so the ON DELETE CASCADE / SET NULL rules above actually run.
+      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+    );
+  }
+
+  /// V2 Step 7: recurring sessions. Every weekly occurrence is stored as
+  /// its own row; these columns link the rows of one series together.
+  Future<void> _addSessionRecurrence(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(study_sessions)');
+    final existing = info.map((c) => c['name'] as String).toSet();
+    if (!existing.contains('recurrence')) {
+      await db.execute(
+        "ALTER TABLE study_sessions ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'",
+      );
+    }
+    if (!existing.contains('recurrenceUntil')) {
+      await db.execute(
+        'ALTER TABLE study_sessions ADD COLUMN recurrenceUntil TEXT',
+      );
+    }
+    if (!existing.contains('seriesId')) {
+      await db.execute('ALTER TABLE study_sessions ADD COLUMN seriesId TEXT');
+    }
+  }
+
+  Future<void> _createSchema(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE students (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        school TEXT NOT NULL,
+        program TEXT NOT NULL,
+        level TEXT NOT NULL,
+        dailyGoalMinutes INTEGER NOT NULL,
+        weeklyGoalMinutes INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE subjects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        difficulty TEXT NOT NULL,
+        colorValue INTEGER NOT NULL,
+        weeklyTargetMinutes INTEGER NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE topics (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE study_sessions (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        topicId TEXT,
+        scheduledDate TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT NOT NULL,
+        actualDuration INTEGER,
+        status TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        rating INTEGER,
+        complete INTEGER NOT NULL DEFAULT 0,
+        recurrence TEXT NOT NULL DEFAULT 'none',
+        recurrenceUntil TEXT,
+        seriesId TEXT,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        subjectId TEXT NOT NULL,
+        topicId TEXT,
+        dueDate TEXT NOT NULL,
+        type TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        completed INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE settings (
+        id INTEGER PRIMARY KEY CHECK (id = 0),
+        notificationsEnabled INTEGER NOT NULL DEFAULT 1,
+        themeMode TEXT NOT NULL DEFAULT 'system'
+      )
+    ''');
+  }
+
+  /// Wipes every table but keeps the schema — used by the
+  /// "Clear All Data" danger-zone action in Step 14.
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('tasks');
+    await db.delete('study_sessions');
+    await db.delete('topics');
+    await db.delete('subjects');
+    await db.delete('students');
+    await db.delete('settings');
+  }
+
+  /// Full replace restore from a parsed backup JSON (see
+  /// BackupService for the schema). Deletes everything currently
+  /// stored, then inserts every row from the backup directly —
+  /// bypassing repository-level validation (e.g. StudySession's
+  /// end-after-start check) since this is trusted historical data
+  /// that was valid when it was first saved.
+  Future<void> restoreFromBackup({
+    Map<String, dynamic>? student,
+    Map<String, dynamic>? settings,
+    required List<Map<String, dynamic>> subjects,
+    required List<Map<String, dynamic>> topics,
+    required List<Map<String, dynamic>> sessions,
+    required List<Map<String, dynamic>> tasks,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('tasks');
+      await txn.delete('study_sessions');
+      await txn.delete('topics');
+      await txn.delete('subjects');
+      await txn.delete('students');
+      await txn.delete('settings');
+
+      if (student != null) {
+        await txn.insert('students', student);
+      }
+      if (settings != null) {
+        await txn.insert('settings', {...settings, 'id': 0});
+      }
+      for (final row in subjects) {
+        await txn.insert('subjects', row);
+      }
+      for (final row in topics) {
+        await txn.insert('topics', row);
+      }
+      for (final row in sessions) {
+        await txn.insert('study_sessions', row);
+      }
+      for (final row in tasks) {
+        await txn.insert('tasks', row);
+      }
+    });
+  }
+}
+
+===== lib\services\sync_schema.dart =====
+
+import 'package:sqflite/sqflite.dart';
+
+/// Tables that are mirrored to Supabase.
+const syncedTables = [
+  'students',
+  'settings',
+  'subjects',
+  'topics',
+  'study_sessions',
+  'tasks',
+];
+
+// SQLite expression for "now" in the same format Dart's toIso8601String()
+// produces (UTC, millisecond precision) so strings compare correctly.
+const _now = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
+
+/// Adds sync bookkeeping to the local database (schema v2).
+/// - updatedAt column on every synced table
+/// - triggers that stamp updatedAt on insert/update
+/// - triggers that record deletes in sync_tombstones
+Future<void> applySyncSchema(Database db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS sync_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  ''');
+
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS sync_tombstones (
+      tableName TEXT NOT NULL,
+      rowId TEXT NOT NULL,
+      deletedAt TEXT NOT NULL,
+      PRIMARY KEY (tableName, rowId)
+    )
+  ''');
+
+  for (final t in syncedTables) {
+    await db.execute('ALTER TABLE $t ADD COLUMN updatedAt TEXT');
+
+    // Existing rows get a timestamp so they upload on the first sync.
+    await db.execute('UPDATE $t SET updatedAt = $_now WHERE updatedAt IS NULL');
+
+    // New row: stamp it, and cancel any pending delete for the same id
+    // (happens when a backup restore re-inserts a row).
+    await db.execute('''
+      CREATE TRIGGER trg_${t}_ai AFTER INSERT ON $t
+      BEGIN
+        DELETE FROM sync_tombstones
+          WHERE tableName = '$t' AND rowId = CAST(NEW.id AS TEXT);
+        UPDATE $t SET updatedAt = $_now
+          WHERE rowid = NEW.rowid AND updatedAt IS NULL;
+      END
+    ''');
+
+    // Edited row: repositories never set updatedAt, so it is unchanged
+    // here and we stamp it. Rows written by the sync itself carry a
+    // different updatedAt, so they are left alone.
+    await db.execute('''
+      CREATE TRIGGER trg_${t}_au AFTER UPDATE ON $t
+      WHEN NEW.updatedAt IS OLD.updatedAt
+      BEGIN
+        UPDATE $t SET updatedAt = $_now WHERE rowid = NEW.rowid;
+      END
+    ''');
+
+    // Deleted row: remember it so the delete can be sent to the cloud.
+    await db.execute('''
+      CREATE TRIGGER trg_${t}_ad AFTER DELETE ON $t
+      BEGIN
+        INSERT OR REPLACE INTO sync_tombstones (tableName, rowId, deletedAt)
+        VALUES ('$t', CAST(OLD.id AS TEXT), $_now);
+      END
+    ''');
+  }
+}
+
+===== lib\screens\subjects\subjects_view_data.dart =====
+
+import '../../models/subject.dart';
+import '../../repositories/subject_repository.dart';
+import '../../repositories/topic_repository.dart';
+
+/// A subject plus the two numbers its list-row card needs: how many
+/// topics it has, and what fraction of them are completed.
+class SubjectSummary {
+  final Subject subject;
+  final int topicCount;
+  final int completionPercent;
+
+  const SubjectSummary({
+    required this.subject,
+    required this.topicCount,
+    required this.completionPercent,
+  });
+
+  static Future<List<SubjectSummary>> loadAll() async {
+    final subjectRepo = SubjectRepository();
+    final topicRepo = TopicRepository();
+
+    final subjects = await subjectRepo.getAll();
+    final summaries = <SubjectSummary>[];
+
+    for (final subject in subjects) {
+      final topics = await topicRepo.getForSubject(subject.id);
+      final completed = topics.where((t) => t.completed).length;
+      final percent = topics.isEmpty
+          ? 0
+          : ((completed / topics.length) * 100).round();
+      summaries.add(SubjectSummary(
+        subject: subject,
+        topicCount: topics.length,
+        completionPercent: percent,
+      ));
+    }
+
+    return summaries;
+  }
+}
+
+===== lib\screens\subjects\subjects_screen.dart =====
+
+import 'package:flutter/material.dart';
+import '../../core/refreshable_screen.dart'; // <- use the real filename, see note below
+import '../../theme/app_theme.dart';
+import '../../widgets/subject_card.dart';
+import '../../widgets/pastel_card.dart';
+import 'subjects_view_data.dart';
+import 'add_edit_subject_screen.dart';
+import 'subject_detail_screen.dart';
+
+class SubjectsScreen extends StatefulWidget {
+  const SubjectsScreen({super.key});
+
+  @override
+  State<SubjectsScreen> createState() => _SubjectsScreenState();
+}
+
+class _SubjectsScreenState extends State<SubjectsScreen>
+    with WidgetsBindingObserver, RefreshableScreenMixin {
+  late Future<List<SubjectSummary>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _future = SubjectSummary.loadAll();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reload();
+    }
+  }
+
+  Future<void> _reload() async {
+    final future = SubjectSummary.loadAll();
+
+    if (!mounted) return;
+
+    setState(() {
+      _future = future;
+    });
+
+    try {
+      await future;
+    } catch (_) {
+      // The FutureBuilder displays the error state.
+    }
+  }
+
+  /// Called by RefreshableScreenMixin when sync brings in cloud changes.
+  @override
+  Future<void> onRefresh() => _reload();
+
+  PastelHue _hueFor(int colorValue) {
+    if (colorValue == AppColors.accentGreenStrong.toARGB32()) {
+      return PastelHue.green;
+    }
+
+    if (colorValue == AppColors.accentBlueStrong.toARGB32()) {
+      return PastelHue.blue;
+    }
+
+    return PastelHue.purple;
+  }
+
+  Future<void> _openAdd() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const AddEditSubjectScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    await _reload();
+  }
+
+  Future<void> _openDetail(String subjectId) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => SubjectDetailScreen(
+          subjectId: subjectId,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (changed == true) {
+      await _reload();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<SubjectSummary>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'Could not load subjects.',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Please try again.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton.icon(
+                    onPressed: _reload,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final summaries = snapshot.data ?? [];
+
+        return Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Subjects',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      Text(
+                        '${summaries.length} active subjects',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.add_circle_rounded,
+                      size: 28,
+                    ),
+                    onPressed: _openAdd,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _reload,
+                  child: summaries.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height:
+                                  MediaQuery.of(context).size.height * 0.55,
+                              child: Center(
+                                child: Text(
+                                  'No subjects yet — tap + to add one.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: summaries.length,
+                          separatorBuilder: (_, __) => const SizedBox(
+                            height: AppSpacing.sm,
+                          ),
+                          itemBuilder: (context, index) {
+                            final summary = summaries[index];
+
+                            return SubjectCard(
+                              name: summary.subject.name,
+                              topicCount: summary.topicCount,
+                              completionPercent: summary.completionPercent,
+                              hue: _hueFor(
+                                summary.subject.colorValue,
+                              ),
+                              onTap: () => _openDetail(
+                                summary.subject.id,
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+===== lib\screens\subjects\add_edit_subject_screen.dart =====
+
+import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../../models/subject.dart';
+import '../../repositories/subject_repository.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/app_buttons.dart';
+import '../../widgets/gradient_background.dart';
+
+/// Handles both creating a new subject (pass no [existing]) and
+/// editing one (pass the current Subject). Pops with `true` when a
+/// save happened, so the caller knows to reload its list.
+class AddEditSubjectScreen extends StatefulWidget {
+  final Subject? existing;
+
+  const AddEditSubjectScreen({super.key, this.existing});
+
+  @override
+  State<AddEditSubjectScreen> createState() => _AddEditSubjectScreenState();
+}
+
+class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
+  late final TextEditingController _nameController;
+  late SubjectDifficulty _difficulty;
+  late double _weeklyTargetHours;
+  late Color _color;
+
+  bool _saving = false;
+  String? _error;
+
+  static const _colorOptions = [
+    AppColors.accentPurpleStrong,
+    AppColors.accentBlueStrong,
+    AppColors.accentGreenStrong,
+  ];
+
+  bool get _isEditing => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final existing = widget.existing;
+
+    _nameController = TextEditingController(
+      text: existing?.name ?? '',
+    );
+
+    _difficulty =
+        existing?.difficulty ?? SubjectDifficulty.medium;
+
+    _weeklyTargetHours =
+        ((existing?.weeklyTargetMinutes ?? 360) / 60).toDouble();
+
+    _color = existing != null
+        ? Color(existing.colorValue)
+        : AppColors.accentPurpleStrong;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+
+    if (name.isEmpty || _saving) return;
+
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      final repo = SubjectRepository();
+
+      if (_isEditing) {
+        final updated = widget.existing!.copyWith(
+          name: name,
+          difficulty: _difficulty,
+          colorValue: _color.toARGB32(),
+          weeklyTargetMinutes: _weeklyTargetHours.round() * 60,
+        );
+
+        await repo.update(updated);
+      } else {
+        final subject = Subject(
+          id: const Uuid().v4(),
+          name: name,
+          difficulty: _difficulty,
+          colorValue: _color.toARGB32(),
+          weeklyTargetMinutes: _weeklyTargetHours.round() * 60,
+          createdAt: DateTime.now(),
+        );
+
+        await repo.create(subject);
+      }
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true);
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _saving = false;
+        _error = 'Could not save the subject. Please try again.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(
+                title: Text(
+                  _isEditing ? 'Edit subject' : 'Add subject',
+                ),
+                leading: const BackButton(),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'Subject Name',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _nameController,
+                                onChanged: (_) {
+                                  setState(() {
+                                    _error = null;
+                                  });
+                                },
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                ),
+                                cursorColor:
+                                    AppColors.accentPurpleStrong,
+                                decoration: InputDecoration(
+                                  hintText: 'Mathematics',
+                                  hintStyle: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  filled: true,
+                                  fillColor: AppColors.surfaceLight,
+                                  border: OutlineInputBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(
+                                      AppRadii.control,
+                                    ),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              Text(
+                                'Difficulty',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              SegmentedButton<SubjectDifficulty>(
+                                segments: const [
+                                  ButtonSegment(
+                                    value: SubjectDifficulty.easy,
+                                    label: Text('Easy'),
+                                  ),
+                                  ButtonSegment(
+                                    value: SubjectDifficulty.medium,
+                                    label: Text('Medium'),
+                                  ),
+                                  ButtonSegment(
+                                    value: SubjectDifficulty.hard,
+                                    label: Text('Hard'),
+                                  ),
+                                ],
+                                selected: {_difficulty},
+                                onSelectionChanged: (selection) {
+                                  setState(() {
+                                    _difficulty = selection.first;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              Text(
+                                'Weekly Target: ${_weeklyTargetHours.round()} hours',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                              Slider(
+                                value: _weeklyTargetHours.clamp(1, 20),
+                                min: 1,
+                                max: 20,
+                                divisions: 19,
+                                activeColor:
+                                    AppColors.accentPurpleStrong,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _weeklyTargetHours = value;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                'Color',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: _colorOptions.map((color) {
+                                  final selected =
+                                      color.toARGB32() == _color.toARGB32();
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: AppSpacing.sm,
+                                    ),
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _color = color;
+                                        });
+                                      },
+                                      child: CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: color,
+                                        child: selected
+                                            ? const Icon(
+                                                Icons.check,
+                                                size: 16,
+                                                color: Colors.white,
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              if (_error != null) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                Text(
+                                  _error!,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Colors.redAccent,
+                                      ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      PrimaryButton(
+                        label: _saving
+                            ? 'Saving...'
+                            : 'Save Subject',
+                        onPressed: _saving ||
+                                _nameController.text.trim().isEmpty
+                            ? null
+                            : _save,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+===== lib\screens\subjects\subject_detail_screen.dart =====
+
+import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../core/refreshable_screen.dart'; // <- use the real filename, see note below
+import '../../models/subject.dart';
+import '../../models/topic.dart';
+import '../../models/study_session.dart';
+import '../../repositories/subject_repository.dart';
+import '../../repositories/topic_repository.dart';
+import '../../repositories/session_repository.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+import '../../utils/date_utils.dart';
+import '../../widgets/gradient_background.dart';
+import '../../widgets/app_buttons.dart';
+import '../../widgets/async_builder.dart';
+import '../../widgets/topic_row.dart';
+import '../session/focus_timer_screen.dart';
+import 'add_edit_subject_screen.dart';
+
+class SubjectDetailScreen extends StatefulWidget {
+  final String subjectId;
+
+  const SubjectDetailScreen({
+    super.key,
+    required this.subjectId,
+  });
+
+  @override
+  State<SubjectDetailScreen> createState() => _SubjectDetailScreenState();
+}
+
+class _SubjectDetailScreenState extends State<SubjectDetailScreen>
+    with WidgetsBindingObserver, RefreshableScreenMixin {
+  final _subjectRepo = SubjectRepository();
+  final _topicRepo = TopicRepository();
+  final _sessionRepo = SessionRepository();
+
+  late Future<_DetailData> _future;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
+    _future = _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _reload();
+    }
+  }
+
+  Future<_DetailData> _load() async {
+    final subject = await _subjectRepo.getById(widget.subjectId);
+
+    if (subject == null) {
+      throw StateError('Subject not found');
+    }
+
+    final topics = await _topicRepo.getForSubject(widget.subjectId);
+    final sessions = await _sessionRepo.getForSubject(widget.subjectId);
+
+    return _DetailData(
+      subject: subject,
+      topics: topics,
+      sessions: sessions,
+    );
+  }
+
+  void _reload() {
+    if (!mounted) return;
+
+    setState(() {
+      _future = _load();
+    });
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted) return;
+
+    final future = _load();
+
+    setState(() {
+      _future = future;
+    });
+
+    try {
+      await future;
+    } catch (_) {
+      // AsyncBuilder will display the error state.
+    }
+  }
+
+  /// Called by RefreshableScreenMixin when sync brings in cloud changes.
+  @override
+  Future<void> onRefresh() => _refresh();
+
+  Future<void> _addTopic(BuildContext context) async {
+    final controller = TextEditingController();
+
+    TransitionRoute<dynamic>? dialogRoute;
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        dialogRoute = ModalRoute.of(dialogContext);
+
+        return AlertDialog(
+          title: const Text('New topic'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'e.g. Differential Equations',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  controller.text.trim(),
+                );
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // Wait until the dialog route has completely finished
+    // its exit transition and has been removed from the overlay.
+    if (dialogRoute != null) {
+      await dialogRoute!.completed;
+    }
+
+    controller.dispose();
+
+    if (name == null || name.isEmpty) return;
+
+    await _topicRepo.create(
+      Topic(
+        id: const Uuid().v4(),
+        subjectId: widget.subjectId,
+        name: name,
+      ),
+    );
+
+    if (!mounted) return;
+
+    _reload();
+  }
+
+  Future<void> _toggleTopic(Topic topic) async {
+    await _topicRepo.setCompleted(
+      topic.id,
+      !topic.completed,
+    );
+
+    if (!mounted) return;
+
+    _reload();
+  }
+
+  Future<void> _deleteTopic(Topic topic) async {
+    await _topicRepo.delete(topic.id);
+
+    if (!mounted) return;
+
+    _reload();
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    Subject subject,
+  ) async {
+    final relatedCount =
+        await _subjectRepo.countRelatedRecords(subject.id);
+
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete subject?'),
+        content: Text(
+          relatedCount > 0
+              ? 'This will also delete $relatedCount related topic(s), session(s), and task(s). This cannot be undone.'
+              : 'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.redAccent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _subjectRepo.delete(subject.id);
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: AsyncBuilder<_DetailData>(
+            future: _future,
+            errorMessage: 'Could not load this subject.',
+            onRetry: _reload,
+            builder: (context, data) {
+              final subject = data.subject;
+
+              final completedTopics =
+                  data.topics.where((t) => t.completed).length;
+
+              final percent = data.topics.isEmpty
+                  ? 0
+                  : ((completedTopics / data.topics.length) * 100).round();
+
+              final weekStart = startOfWeek(DateTime.now());
+              final weekEnd = endOfWeek(DateTime.now());
+
+              final thisWeekMinutes = data.sessions
+                  .where(
+                    (s) =>
+                        s.complete &&
+                        s.scheduledDate.isAfter(
+                          weekStart.subtract(
+                            const Duration(seconds: 1),
+                          ),
+                        ) &&
+                        s.scheduledDate.isBefore(weekEnd),
+                  )
+                  .fold(
+                    0,
+                    (sum, s) => sum + (s.actualDuration ?? 0),
+                  );
+
+              final completedSessions =
+                  data.sessions.where((s) => s.complete).toList();
+
+              return Column(
+                children: [
+                  AppBar(
+                    title: Text(subject.name),
+                    leading: const BackButton(),
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'Edit subject',
+                        onPressed: () async {
+                          final changed =
+                              await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) => AddEditSubjectScreen(
+                                existing: subject,
+                              ),
+                            ),
+                          );
+
+                          if (!mounted) return;
+
+                          if (changed == true) {
+                            _reload();
+                          } else {
+                            // Refresh anyway in case data changed
+                            // through another route or process.
+                            _reload();
+                          }
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Delete subject',
+                        onPressed: () =>
+                            _confirmDelete(context, subject),
+                      ),
+                    ],
+                  ),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: ListView(
+                        physics:
+                            const AlwaysScrollableScrollPhysics(),
+                        padding:
+                            const EdgeInsets.all(AppSpacing.lg),
+                        children: [
+                          Container(
+                            padding:
+                                const EdgeInsets.all(AppSpacing.lg),
+                            decoration: BoxDecoration(
+                              color: context.cardSurface,
+                              borderRadius:
+                                  BorderRadius.circular(
+                                AppRadii.card,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${data.topics.length} topics • weekly target ${subject.weeklyTargetMinutes ~/ 60}h',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color:
+                                            AppColors.textSecondary,
+                                      ),
+                                ),
+                                const SizedBox(
+                                  height: AppSpacing.sm,
+                                ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '${formatDuration(thisWeekMinutes)} studied this week',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight:
+                                                FontWeight.w500,
+                                          ),
+                                    ),
+                                    Text(
+                                      '$percent%',
+                                      style: TextStyle(
+                                        fontWeight:
+                                            FontWeight.w600,
+                                        color: Color(
+                                          subject.colorValue,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(
+                            height: AppSpacing.lg,
+                          ),
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Topics',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium,
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                ),
+                                tooltip: 'Add topic',
+                                onPressed: () =>
+                                    _addTopic(context),
+                              ),
+                            ],
+                          ),
+                          ...data.topics.map(
+                            (topic) => TopicRow(
+                              name: topic.name,
+                              completed: topic.completed,
+                              onChanged: (_) =>
+                                  _toggleTopic(topic),
+                              onDelete: () =>
+                                  _deleteTopic(topic),
+                            ),
+                          ),
+                          if (data.topics.isEmpty)
+                            Text(
+                              'No topics yet — add your first one above.',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color:
+                                        AppColors.textSecondary,
+                                  ),
+                            ),
+                          const SizedBox(
+                            height: AppSpacing.lg,
+                          ),
+                          Text(
+                            'Recent Sessions',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium,
+                          ),
+                          const SizedBox(
+                            height: AppSpacing.sm,
+                          ),
+                          ...completedSessions.take(5).map(
+                                (session) =>
+                                    _RecentSessionRow(
+                                  session: session,
+                                ),
+                              ),
+                          if (completedSessions.isEmpty)
+                            Text(
+                              'No sessions recorded yet.',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color:
+                                        AppColors.textSecondary,
+                                  ),
+                            ),
+                          const SizedBox(
+                            height: AppSpacing.lg,
+                          ),
+                          PrimaryButton(
+                            label: 'Start Session',
+                            onPressed: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      FocusTimerScreen(
+                                    subjectId: subject.id,
+                                    subjectName: subject.name,
+                                    subjectColorValue:
+                                        subject.colorValue,
+                                  ),
+                                ),
+                              );
+
+                              if (!mounted) return;
+
+                              _reload();
+                            },
+                          ),
+                          const SizedBox(
+                            height: AppSpacing.lg,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailData {
+  final Subject subject;
+  final List<Topic> topics;
+  final List<StudySession> sessions;
+
+  const _DetailData({
+    required this.subject,
+    required this.topics,
+    required this.sessions,
+  });
+}
+
+class _RecentSessionRow extends StatelessWidget {
+  final StudySession session;
+
+  const _RecentSessionRow({
+    required this.session,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final weekday =
+        _weekdayName(session.scheduledDate.weekday);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment:
+            MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            weekday,
+            style:
+                Theme.of(context).textTheme.bodyMedium,
+          ),
+          Text(
+            formatDuration(
+              session.actualDuration ?? 0,
+            ),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _weekdayName(int weekday) {
+    const names = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    return names[weekday - 1];
+  }
+}
+
+===== lib\widgets\subject_card.dart =====
+
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+import 'pastel_card.dart';
+
+/// Subject row on the Subjects screen: initial badge, name, topic
+/// count, and completion percentage.
+class SubjectCard extends StatelessWidget {
+  final String name;
+  final int topicCount;
+  final int completionPercent;
+  final PastelHue hue;
+  final VoidCallback? onTap;
+
+  const SubjectCard({
+    super.key,
+    required this.name,
+    required this.topicCount,
+    required this.completionPercent,
+    required this.hue,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final strong = pastelStrong(hue);
+    return PastelCard(
+      hue: hue,
+      onTap: onTap,
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: strong,
+            child: Text(
+              name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$topicCount topics',
+                  style: TextStyle(fontSize: 12, color: strong.withOpacity(0.85)),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '$completionPercent%',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: strong,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+===== lib\widgets\topic_row.dart =====
+
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+/// A single topic line on the Subject detail screen — checkbox plus
+/// name, struck through once completed.
+class TopicRow extends StatelessWidget {
+  final String name;
+  final bool completed;
+  final ValueChanged<bool?> onChanged;
+  final VoidCallback? onDelete;
+
+  const TopicRow({
+    super.key,
+    required this.name,
+    required this.completed,
+    required this.onChanged,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: completed,
+            onChanged: onChanged,
+            activeColor: AppColors.accentPurpleStrong,
+          ),
+          Expanded(
+            child: Text(
+              name,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                decoration: completed ? TextDecoration.lineThrough : null,
+                color: completed
+                    ? AppColors.textSecondary
+                    : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+              ),
+            ),
+          ),
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.close_rounded, size: 18),
+              color: AppColors.textSecondary,
+              onPressed: onDelete,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+===== lib\core\refreshable_screen.dart =====
+
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'data_refresh_bus.dart';
+
+/// Mixin any StatefulWidget's State with this to get:
+/// - auto-refresh when relevant data changes elsewhere in the app
+/// - pull-to-refresh wired to the same reload function
+mixin RefreshableScreenMixin<T extends StatefulWidget> on State<T> {
+  StreamSubscription<RefreshScope>? _refreshSub;
+
+  /// Override: which scopes should trigger a refresh on this screen
+  List<RefreshScope> get watchedScopes => [RefreshScope.all];
+
+  /// Override: how this screen reloads its data
+  Future<void> onRefresh();
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshSub = DataRefreshBus.instance.stream.listen((scope) {
+      if (watchedScopes.contains(scope) || scope == RefreshScope.all) {
+        onRefresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshSub?.cancel();
+    super.dispose();
+  }
+
+  Widget buildRefreshable({required Widget child}) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: child,
+    );
+  }
+}
+
+===== lib\app\routes.dart =====
+
+import 'package:flutter/material.dart';
+import 'startup_decider.dart';
+import '../screens/timetable/plan_session_screen.dart';
+
+class AppRoutes {
+  AppRoutes._();
+
+  static const root = '/';
+  static const plan = '/plan';
+
+  static Map<String, WidgetBuilder> get table => {
+        root: (_) => const StartupDecider(),
+        plan: (_) => const PlanSessionScreen(),
+      };
+}
+
+===== lib\screens\tasks\tasks_screen.dart =====
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../../models/subject.dart';
+import '../../models/task.dart';
+import '../../repositories/task_repository.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+import '../../utils/date_utils.dart';
+import '../../widgets/gradient_background.dart';
+import 'tasks_view_data.dart';
+import 'add_edit_task_screen.dart';
+
+class TasksScreen extends StatefulWidget {
+  const TasksScreen({super.key});
+
+  @override
+  State<TasksScreen> createState() => _TasksScreenState();
+}
+
+class _TasksScreenState extends State<TasksScreen> {
+  final _taskRepo = TaskRepository();
+
+  /// The list currently on screen. Held in state (not in a Future) so
+  /// every change goes through a plain setState.
+  TasksViewData? _data;
+  Object? _error;
+
+  /// Ticks the person just made, shown immediately on screen until the
+  /// reload from the database confirms them.
+  final Map<String, bool> _pending = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  /// Reloads from the database. Called after every action on this
+  /// screen and by pull-to-refresh.
+  Future<void> _reload() async {
+    try {
+      final data = await TasksViewData.load();
+      if (!mounted) return;
+      debugPrint(
+        '[Tasks] reload: overdue=${data.overdue.length} today=${data.today.length} '
+        'tomorrow=${data.tomorrow.length} upcoming=${data.upcoming.length}',
+      );
+      setState(() {
+        _data = data;
+        _error = null;
+        _pending.clear();
+      });
+    } catch (e, st) {
+      debugPrint('[Tasks] reload failed: $e\n$st');
+      if (!mounted) return;
+      setState(() {
+        if (_data == null) _error = e;
+      });
+    }
+  }
+
+  Future<void> _retry() async {
+    setState(() => _error = null);
+    await _reload();
+  }
+
+  Future<void> _toggle(Task task) async {
+    final newValue = !(_pending[task.id] ?? task.completed);
+    debugPrint('[Tasks] toggle ${task.id} -> $newValue');
+
+    // 1) Instant feedback on screen.
+    setState(() => _pending[task.id] = newValue);
+
+    // 2) Save to the database.
+    try {
+      await _taskRepo.setCompleted(task.id, newValue);
+      debugPrint('[Tasks] saved ${task.id}');
+    } catch (e, st) {
+      debugPrint('[Tasks] toggle failed: $e\n$st');
+      if (!mounted) return;
+      setState(() => _pending.remove(task.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update the task: $e')),
+      );
+      return;
+    }
+
+    // 3) Reload from the database.
+    await _reload();
+  }
+
+  Future<void> _openCreate() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AddEditTaskScreen()),
+    );
+    await _reload();
+  }
+
+  Future<void> _openEdit(Task task) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => AddEditTaskScreen(existing: task)),
+    );
+    await _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(
+                title: const Text('Things you need to accomplish'),
+                leading: const BackButton(),
+                actions: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.add_circle_rounded,
+                      color: AppColors.primary,
+                    ),
+                    tooltip: 'Add a task',
+                    onPressed: _openCreate,
+                  ),
+                ],
+              ),
+              Expanded(child: _buildBody(context)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    final data = _data;
+
+    if (data == null) {
+      if (_error != null) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  size: 32,
+                  color: context.secondaryText,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Could not load your tasks.',
+                  style: TextStyle(color: context.secondaryText),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextButton(
+                  onPressed: _retry,
+                  child: const Text('Try again'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return _buildContent(context, data);
+  }
+
+  /// The loaded list with the person's not-yet-confirmed ticks applied.
+  List<Task> _withPending(List<Task> tasks) {
+    return tasks.map((t) {
+      final override = _pending[t.id];
+      return override == null ? t : t.copyWith(completed: override);
+    }).toList();
+  }
+
+  Widget _buildContent(BuildContext context, TasksViewData data) {
+    final overdue = _withPending(data.overdue);
+    final today = _withPending(data.today);
+    final tomorrow = _withPending(data.tomorrow);
+    final upcoming = _withPending(data.upcoming);
+
+    final hasAnyTasks = overdue.isNotEmpty ||
+        today.isNotEmpty ||
+        tomorrow.isNotEmpty ||
+        upcoming.isNotEmpty;
+
+    if (!hasAnyTasks) {
+      return RefreshIndicator(
+        onRefresh: _reload,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: Center(
+                child: Text(
+                  'No tasks yet — tap + to add one.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: context.secondaryText,
+                      ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final pendingCount = [...overdue, ...today, ...tomorrow, ...upcoming]
+        .where((t) => !t.completed)
+        .length;
+    final overdueCount = overdue.where((t) => !t.completed).length;
+
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          24,
+        ),
+        children: [
+          _SummaryLine(pending: pendingCount, overdue: overdueCount),
+          const SizedBox(height: AppSpacing.lg),
+          if (overdue.isNotEmpty)
+            _TaskGroup(
+              title: 'Overdue',
+              isOverdue: true,
+              tasks: overdue,
+              subjectsById: data.subjectsById,
+              onToggle: _toggle,
+              onTap: _openEdit,
+            ),
+          if (today.isNotEmpty)
+            _TaskGroup(
+              title: 'Today',
+              tasks: today,
+              subjectsById: data.subjectsById,
+              onToggle: _toggle,
+              onTap: _openEdit,
+            ),
+          if (tomorrow.isNotEmpty)
+            _TaskGroup(
+              title: 'Tomorrow',
+              tasks: tomorrow,
+              subjectsById: data.subjectsById,
+              onToggle: _toggle,
+              onTap: _openEdit,
+            ),
+          if (upcoming.isNotEmpty)
+            _TaskGroup(
+              title: 'Upcoming',
+              tasks: upcoming,
+              subjectsById: data.subjectsById,
+              onToggle: _toggle,
+              onTap: _openEdit,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryLine extends StatelessWidget {
+  final int pending;
+  final int overdue;
+
+  const _SummaryLine({required this.pending, required this.overdue});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final pendingText = pending == 0
+        ? 'All caught up'
+        : pending == 1
+            ? '1 task pending'
+            : '$pending tasks pending';
+
+    return Row(
+      children: [
+        Text(
+          pendingText,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: context.secondaryText,
+          ),
+        ),
+        if (overdue > 0) ...[
+          Text(
+            '  ·  ',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: context.secondaryText,
+            ),
+          ),
+          Text(
+            '$overdue overdue',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.danger,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TaskGroup extends StatelessWidget {
+  final String title;
+  final bool isOverdue;
+  final List<Task> tasks;
+  final Map<String, Subject> subjectsById;
+  final ValueChanged<Task> onToggle;
+  final ValueChanged<Task> onTap;
+
+  const _TaskGroup({
+    required this.title,
+    this.isOverdue = false,
+    required this.tasks,
+    required this.subjectsById,
+    required this.onToggle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$title (${tasks.length})',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isOverdue ? AppColors.danger : null,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ...tasks.map(
+            (task) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _TaskTile(
+                key: ValueKey(task.id),
+                task: task,
+                subject: subjectsById[task.subjectId],
+                onToggle: () => onToggle(task),
+                onTap: () => onTap(task),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskTile extends StatelessWidget {
+  final Task task;
+  final Subject? subject;
+  final VoidCallback onToggle;
+  final VoidCallback onTap;
+
+  const _TaskTile({
+    super.key,
+    required this.task,
+    required this.subject,
+    required this.onToggle,
+    required this.onTap,
+  });
+
+  static String _typeLabel(TaskType type) {
+    switch (type) {
+      case TaskType.assignment:
+        return 'Assignment';
+      case TaskType.reading:
+        return 'Reading';
+      case TaskType.revision:
+        return 'Revision';
+      case TaskType.project:
+        return 'Project';
+      case TaskType.other:
+        return 'Task';
+    }
+  }
+
+  static String _dueLabel(DateTime due) {
+    final now = DateTime.now();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final dueDay = DateTime.utc(due.year, due.month, due.day);
+    final diff = dueDay.difference(today).inDays;
+
+    if (diff < 0) return diff == -1 ? '1 day overdue' : '${-diff} days overdue';
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Tomorrow';
+
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${weekdays[due.weekday - 1]}, ${months[due.month - 1]} ${due.day}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent =
+        subject != null ? Color(subject!.colorValue) : AppColors.primary;
+    final isOverdue =
+        !task.completed && task.dueDate.isBefore(startOfDay(DateTime.now()));
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.cardSmall),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: context.cardSurfaceAlt,
+            borderRadius: BorderRadius.circular(AppRadii.cardSmall),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Checkbox(
+                value: task.completed,
+                onChanged: (_) => onToggle(),
+                activeColor: accent,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        decoration:
+                            task.completed ? TextDecoration.lineThrough : null,
+                        color: task.completed
+                            ? context.secondaryText
+                            : context.primaryText,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${subject?.name ?? 'Unknown subject'} · ${_typeLabel(task.type)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: context.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                task.completed ? 'Done' : _dueLabel(task.dueDate),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: isOverdue ? AppColors.danger : context.secondaryText,
+                  fontWeight: isOverdue ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

@@ -1,3 +1,4 @@
+
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -11,7 +12,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'study_architect.db';
-  static const _dbVersion = 3;
+  static const _dbVersion = 4;
 
   Database? _db;
 
@@ -33,6 +34,7 @@ class DatabaseService {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await applySyncSchema(db);
         if (oldVersion < 3) await _addSessionRecurrence(db);
+        if (oldVersion < 4) await _addTopicSortOrder(db);
       },
       // sqflite does not enforce foreign keys by default — turn them on
       // so the ON DELETE CASCADE / SET NULL rules above actually run.
@@ -58,6 +60,27 @@ class DatabaseService {
     if (!existing.contains('seriesId')) {
       await db.execute('ALTER TABLE study_sessions ADD COLUMN seriesId TEXT');
     }
+  }
+
+  /// V2 Step 9: ordered study roadmap. Adds topics.sortOrder and gives
+  /// every existing topic a position that keeps the order it was created
+  /// in (per subject). The update triggers stamp updatedAt, so the new
+  /// positions upload to the cloud on the next sync.
+  Future<void> _addTopicSortOrder(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(topics)');
+    final existing = info.map((c) => c['name'] as String).toSet();
+    if (existing.contains('sortOrder')) return;
+
+    await db.execute(
+      'ALTER TABLE topics ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute('''
+      UPDATE topics
+      SET sortOrder = (
+        SELECT COUNT(*) FROM topics t2
+        WHERE t2.subjectId = topics.subjectId AND t2.rowid < topics.rowid
+      )
+    ''');
   }
 
   Future<void> _createSchema(Database db, int version) async {
@@ -90,6 +113,7 @@ class DatabaseService {
         subjectId TEXT NOT NULL,
         name TEXT NOT NULL,
         completed INTEGER NOT NULL DEFAULT 0,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE
       )
     ''');
