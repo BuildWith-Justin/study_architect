@@ -1,0 +1,2689 @@
+STUDY ARCHITECT V2 - STEP 10 DUMP
+
+===== FILE LIST (lib) =====
+lib\main.dart
+lib\.github\workflows\supabase-keepalive.yml
+lib\app\app.dart
+lib\app\route_observer.dart
+lib\app\routes.dart
+lib\app\startup_decider.dart
+lib\app\theme_controller.dart
+lib\core\data_refresh_bus.dart
+lib\core\refreshable_screen.dart
+lib\core\sync\syncable.dart
+lib\features\auth\auth_diagnostics_screen.dart
+lib\features\auth\auth_gate.dart
+lib\features\auth\auth_service.dart
+lib\features\auth\auth_widgets.dart
+lib\features\auth\password_prompt_card.dart
+lib\features\auth\password_prompt_gate.dart
+lib\features\auth\set_password_screen.dart
+lib\features\auth\sign_in_screen.dart
+lib\features\auth\sign_up_screen.dart
+lib\models\settings.dart
+lib\models\student.dart
+lib\models\study_session.dart
+lib\models\subject.dart
+lib\models\task.dart
+lib\models\topic.dart
+lib\repositories\session_repository.dart
+lib\repositories\settings_repository.dart
+lib\repositories\student_repository.dart
+lib\repositories\subject_repository.dart
+lib\repositories\task_repository.dart
+lib\repositories\topic_repository.dart
+lib\screens\home\home_screen.dart
+lib\screens\home\home_view_data.dart
+lib\screens\more\backup_screen.dart
+lib\screens\more\edit_goals_screen.dart
+lib\screens\more\edit_profile_screen.dart
+lib\screens\more\more_screen.dart
+lib\screens\more\more_view_data.dart
+lib\screens\onboarding\goal_dial_screen.dart
+lib\screens\onboarding\goal_setup_screen.dart
+lib\screens\onboarding\onboarding_flow.dart
+lib\screens\onboarding\profile_setup_screen.dart
+lib\screens\onboarding\subject_setup_screen.dart
+lib\screens\onboarding\subjects_setup_screen.dart
+lib\screens\onboarding\welcome_screen.dart
+lib\screens\plan\plan_session_screen.dart
+lib\screens\progress\progress_screen.dart
+lib\screens\progress\progress_view_data.dart
+lib\screens\session\create_session_screen.dart
+lib\screens\session\focus_timer_screen.dart
+lib\screens\session\session_complete_screen.dart
+lib\screens\subjects\add_edit_subject_screen.dart
+lib\screens\subjects\subject_detail_screen.dart
+lib\screens\subjects\subjects_screen.dart
+lib\screens\subjects\subjects_view_data.dart
+lib\screens\tasks\add_edit_task_screen.dart
+lib\screens\tasks\tasks_screen.dart
+lib\screens\tasks\tasks_view_data.dart
+lib\screens\timetable\add_edit_session_screen.dart
+lib\screens\timetable\plan_session_screen.dart
+lib\screens\timetable\timetable_screen.dart
+lib\screens\timetable\timetable_view_data.dart
+lib\services\backup_service.dart
+lib\services\database_service.dart
+lib\services\notification_service.dart
+lib\services\sync_schema.dart
+lib\services\sync_service.dart
+lib\theme\app_theme.dart
+lib\theme\dark_theme.dart
+lib\theme\light_theme.dart
+lib\theme\theme_helpers.dart
+lib\utils\date_utils.dart
+lib\utils\session_recurrence.dart
+lib\utils\study_insights.dart
+lib\utils\study_stats.dart
+lib\widgets\app_buttons.dart
+lib\widgets\app_logo.dart
+lib\widgets\async_builder.dart
+lib\widgets\class_card.dart
+lib\widgets\daily_goal_dial.dart
+lib\widgets\focus_ring.dart
+lib\widgets\gradient_background.dart
+lib\widgets\insight_carousel.dart
+lib\widgets\main_scaffold.dart
+lib\widgets\pastel_card.dart
+lib\widgets\progress_card.dart
+lib\widgets\roadmap_topic_tile.dart
+lib\widgets\schedule_row.dart
+lib\widgets\screen_placeholder.dart
+lib\widgets\simple_bar_chart.dart
+lib\widgets\splash_view.dart
+lib\widgets\stat_card.dart
+lib\widgets\subject_card.dart
+lib\widgets\subject_list_tile.dart
+lib\widgets\task_card.dart
+lib\widgets\timeline_event_card.dart
+lib\widgets\topic_row.dart
+
+===== pubspec.yaml =====
+name: study_architect
+description: "Study Architect — local-first Flutter study planner and tracker."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.2.1
+  sqflite: ^2.3.3
+  sqflite_common_ffi: ^2.4.3
+  path: ^1.9.0
+  uuid: ^4.6.0
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
+  file_picker: ^13.1.0
+  share_plus: ^13.3.0
+  path_provider: ^2.1.4
+  supabase_flutter: ^2.8.0
+  flutter_dotenv: ^5.2.1
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
+
+===== lib\core\refreshable_screen.dart =====
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'data_refresh_bus.dart';
+
+/// Mixin any StatefulWidget's State with this to get:
+/// - auto-refresh when relevant data changes elsewhere in the app
+/// - pull-to-refresh wired to the same reload function
+mixin RefreshableScreenMixin<T extends StatefulWidget> on State<T> {
+  StreamSubscription<RefreshScope>? _refreshSub;
+
+  /// Override: which scopes should trigger a refresh on this screen
+  List<RefreshScope> get watchedScopes => [RefreshScope.all];
+
+  /// Override: how this screen reloads its data
+  Future<void> onRefresh();
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshSub = DataRefreshBus.instance.stream.listen((scope) {
+      if (watchedScopes.contains(scope) || scope == RefreshScope.all) {
+        onRefresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshSub?.cancel();
+    super.dispose();
+  }
+
+  Widget buildRefreshable({required Widget child}) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: child,
+    );
+  }
+}
+
+===== lib\core\data_refresh_bus.dart =====
+import 'dart:async';
+
+enum RefreshScope {
+  subjects,
+  sessions,
+  tasks,
+  exams,
+  achievements,
+  all,
+}
+
+class DataRefreshBus {
+  DataRefreshBus._internal();
+  static final DataRefreshBus instance = DataRefreshBus._internal();
+
+  final StreamController<RefreshScope> _controller =
+      StreamController<RefreshScope>.broadcast();
+
+  Stream<RefreshScope> get stream => _controller.stream;
+
+  void notify(RefreshScope scope) {
+    _controller.add(scope);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+===== lib\services\database_service.dart =====
+
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+import 'sync_schema.dart';
+
+/// Owns the single sqflite Database instance and schema. Screens never
+/// touch this directly — they go through the repositories in
+/// lib/repositories/, which call DatabaseService.instance.database.
+class DatabaseService {
+  DatabaseService._internal();
+  static final DatabaseService instance = DatabaseService._internal();
+
+  static const _dbName = 'study_architect.db';
+  static const _dbVersion = 4;
+
+  Database? _db;
+
+  Future<Database> get database async {
+    _db ??= await _open();
+    return _db!;
+  }
+
+  Future<Database> _open() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, _dbName);
+    return openDatabase(
+      path,
+      version: _dbVersion,
+      onCreate: (db, version) async {
+        await _createSchema(db, version);
+        await applySyncSchema(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await applySyncSchema(db);
+        if (oldVersion < 3) await _addSessionRecurrence(db);
+        if (oldVersion < 4) await _addTopicSortOrder(db);
+      },
+      // sqflite does not enforce foreign keys by default — turn them on
+      // so the ON DELETE CASCADE / SET NULL rules above actually run.
+      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+    );
+  }
+
+  /// V2 Step 7: recurring sessions. Every weekly occurrence is stored as
+  /// its own row; these columns link the rows of one series together.
+  Future<void> _addSessionRecurrence(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(study_sessions)');
+    final existing = info.map((c) => c['name'] as String).toSet();
+    if (!existing.contains('recurrence')) {
+      await db.execute(
+        "ALTER TABLE study_sessions ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'",
+      );
+    }
+    if (!existing.contains('recurrenceUntil')) {
+      await db.execute(
+        'ALTER TABLE study_sessions ADD COLUMN recurrenceUntil TEXT',
+      );
+    }
+    if (!existing.contains('seriesId')) {
+      await db.execute('ALTER TABLE study_sessions ADD COLUMN seriesId TEXT');
+    }
+  }
+
+  /// V2 Step 9: ordered study roadmap. Adds topics.sortOrder and gives
+  /// every existing topic a position that keeps the order it was created
+  /// in (per subject). The update triggers stamp updatedAt, so the new
+  /// positions upload to the cloud on the next sync.
+  Future<void> _addTopicSortOrder(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(topics)');
+    final existing = info.map((c) => c['name'] as String).toSet();
+    if (existing.contains('sortOrder')) return;
+
+    await db.execute(
+      'ALTER TABLE topics ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute('''
+      UPDATE topics
+      SET sortOrder = (
+        SELECT COUNT(*) FROM topics t2
+        WHERE t2.subjectId = topics.subjectId AND t2.rowid < topics.rowid
+      )
+    ''');
+  }
+
+  Future<void> _createSchema(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE students (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        school TEXT NOT NULL,
+        program TEXT NOT NULL,
+        level TEXT NOT NULL,
+        dailyGoalMinutes INTEGER NOT NULL,
+        weeklyGoalMinutes INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE subjects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        difficulty TEXT NOT NULL,
+        colorValue INTEGER NOT NULL,
+        weeklyTargetMinutes INTEGER NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE topics (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE study_sessions (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        topicId TEXT,
+        scheduledDate TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT NOT NULL,
+        actualDuration INTEGER,
+        status TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        rating INTEGER,
+        complete INTEGER NOT NULL DEFAULT 0,
+        recurrence TEXT NOT NULL DEFAULT 'none',
+        recurrenceUntil TEXT,
+        seriesId TEXT,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        subjectId TEXT NOT NULL,
+        topicId TEXT,
+        dueDate TEXT NOT NULL,
+        type TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        completed INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE settings (
+        id INTEGER PRIMARY KEY CHECK (id = 0),
+        notificationsEnabled INTEGER NOT NULL DEFAULT 1,
+        themeMode TEXT NOT NULL DEFAULT 'system'
+      )
+    ''');
+  }
+
+  /// Wipes every table but keeps the schema — used by the
+  /// "Clear All Data" danger-zone action in Step 14.
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('tasks');
+    await db.delete('study_sessions');
+    await db.delete('topics');
+    await db.delete('subjects');
+    await db.delete('students');
+    await db.delete('settings');
+  }
+
+  /// Full replace restore from a parsed backup JSON (see
+  /// BackupService for the schema). Deletes everything currently
+  /// stored, then inserts every row from the backup directly —
+  /// bypassing repository-level validation (e.g. StudySession's
+  /// end-after-start check) since this is trusted historical data
+  /// that was valid when it was first saved.
+  Future<void> restoreFromBackup({
+    Map<String, dynamic>? student,
+    Map<String, dynamic>? settings,
+    required List<Map<String, dynamic>> subjects,
+    required List<Map<String, dynamic>> topics,
+    required List<Map<String, dynamic>> sessions,
+    required List<Map<String, dynamic>> tasks,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('tasks');
+      await txn.delete('study_sessions');
+      await txn.delete('topics');
+      await txn.delete('subjects');
+      await txn.delete('students');
+      await txn.delete('settings');
+
+      if (student != null) {
+        await txn.insert('students', student);
+      }
+      if (settings != null) {
+        await txn.insert('settings', {...settings, 'id': 0});
+      }
+      for (final row in subjects) {
+        await txn.insert('subjects', row);
+      }
+      for (final row in topics) {
+        await txn.insert('topics', row);
+      }
+      for (final row in sessions) {
+        await txn.insert('study_sessions', row);
+      }
+      for (final row in tasks) {
+        await txn.insert('tasks', row);
+      }
+    });
+  }
+}
+
+
+===== lib\models\study_session.dart =====
+enum SessionStatus { planned, inProgress, completed, missed }
+
+SessionStatus statusFromString(String value) {
+  return SessionStatus.values.firstWhere(
+    (s) => s.name == value,
+    orElse: () => SessionStatus.planned,
+  );
+}
+
+/// V2 Step 7: how a session repeats. Every occurrence of a repeating
+/// session is stored as its own row; rows of one series share a seriesId.
+enum SessionRecurrence { none, weekly }
+
+SessionRecurrence recurrenceFromString(String value) {
+  return SessionRecurrence.values.firstWhere(
+    (r) => r.name == value,
+    orElse: () => SessionRecurrence.none,
+  );
+}
+
+class StudySession {
+  final String id;
+  final String subjectId;
+  final String? topicId;
+  final DateTime scheduledDate;
+  final DateTime startTime;
+  final DateTime endTime;
+  final int? actualDuration; // minutes, filled in once a session runs
+  final SessionStatus status;
+  final String notes;
+  final int? rating; // 1-5, optional, set at session end
+  final bool complete;
+  final SessionRecurrence recurrence;
+  final DateTime? recurrenceUntil; // last day of the series (inclusive)
+  final String? seriesId; // shared by every occurrence of one series
+
+  const StudySession({
+    required this.id,
+    required this.subjectId,
+    this.topicId,
+    required this.scheduledDate,
+    required this.startTime,
+    required this.endTime,
+    this.actualDuration,
+    this.status = SessionStatus.planned,
+    this.notes = '',
+    this.rating,
+    this.complete = false,
+    this.recurrence = SessionRecurrence.none,
+    this.recurrenceUntil,
+    this.seriesId,
+  });
+
+  /// Business rule: a session cannot be saved with an end time earlier
+  /// than or equal to its start time.
+  bool get isTimeRangeValid => endTime.isAfter(startTime);
+
+  /// True when this session is one occurrence of a repeating series.
+  bool get isRecurring => seriesId != null;
+
+  StudySession copyWith({
+    String? id,
+    String? subjectId,
+    String? topicId,
+    DateTime? scheduledDate,
+    DateTime? startTime,
+    DateTime? endTime,
+    int? actualDuration,
+    SessionStatus? status,
+    String? notes,
+    int? rating,
+    bool? complete,
+    SessionRecurrence? recurrence,
+    DateTime? recurrenceUntil,
+    String? seriesId,
+  }) {
+    return StudySession(
+      id: id ?? this.id,
+      subjectId: subjectId ?? this.subjectId,
+      topicId: topicId ?? this.topicId,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      actualDuration: actualDuration ?? this.actualDuration,
+      status: status ?? this.status,
+      notes: notes ?? this.notes,
+      rating: rating ?? this.rating,
+      complete: complete ?? this.complete,
+      recurrence: recurrence ?? this.recurrence,
+      recurrenceUntil: recurrenceUntil ?? this.recurrenceUntil,
+      seriesId: seriesId ?? this.seriesId,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'subjectId': subjectId,
+        'topicId': topicId,
+        'scheduledDate': scheduledDate.toIso8601String(),
+        'startTime': startTime.toIso8601String(),
+        'endTime': endTime.toIso8601String(),
+        'actualDuration': actualDuration,
+        'status': status.name,
+        'notes': notes,
+        'rating': rating,
+        'complete': complete ? 1 : 0,
+        'recurrence': recurrence.name,
+        'recurrenceUntil': recurrenceUntil?.toIso8601String(),
+        'seriesId': seriesId,
+      };
+
+  factory StudySession.fromMap(Map<String, dynamic> map) => StudySession(
+        id: map['id'] as String,
+        subjectId: map['subjectId'] as String,
+        topicId: map['topicId'] as String?,
+        scheduledDate: DateTime.parse(map['scheduledDate'] as String),
+        startTime: DateTime.parse(map['startTime'] as String),
+        endTime: DateTime.parse(map['endTime'] as String),
+        actualDuration: map['actualDuration'] as int?,
+        status: statusFromString(map['status'] as String),
+        notes: map['notes'] as String? ?? '',
+        rating: map['rating'] as int?,
+        complete: (map['complete'] as int) == 1,
+        // Older rows and older backups have no recurrence columns.
+        recurrence: recurrenceFromString(map['recurrence'] as String? ?? 'none'),
+        recurrenceUntil: map['recurrenceUntil'] == null
+            ? null
+            : DateTime.parse(map['recurrenceUntil'] as String),
+        seriesId: map['seriesId'] as String?,
+      );
+}
+
+
+===== lib\models\subject.dart =====
+enum SubjectDifficulty { easy, medium, hard }
+
+SubjectDifficulty difficultyFromString(String value) {
+  return SubjectDifficulty.values.firstWhere(
+    (d) => d.name == value,
+    orElse: () => SubjectDifficulty.medium,
+  );
+}
+
+class Subject {
+  final String id;
+  final String name;
+  final SubjectDifficulty difficulty;
+  final int colorValue; // ARGB int, e.g. AppColors.accentPurpleStrong.value
+  final int weeklyTargetMinutes;
+  final DateTime createdAt;
+
+  const Subject({
+    required this.id,
+    required this.name,
+    required this.difficulty,
+    required this.colorValue,
+    required this.weeklyTargetMinutes,
+    required this.createdAt,
+  });
+
+  Subject copyWith({
+    String? id,
+    String? name,
+    SubjectDifficulty? difficulty,
+    int? colorValue,
+    int? weeklyTargetMinutes,
+    DateTime? createdAt,
+  }) {
+    return Subject(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      difficulty: difficulty ?? this.difficulty,
+      colorValue: colorValue ?? this.colorValue,
+      weeklyTargetMinutes: weeklyTargetMinutes ?? this.weeklyTargetMinutes,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'difficulty': difficulty.name,
+        'colorValue': colorValue,
+        'weeklyTargetMinutes': weeklyTargetMinutes,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory Subject.fromMap(Map<String, dynamic> map) => Subject(
+        id: map['id'] as String,
+        name: map['name'] as String,
+        difficulty: difficultyFromString(map['difficulty'] as String),
+        colorValue: map['colorValue'] as int,
+        weeklyTargetMinutes: map['weeklyTargetMinutes'] as int,
+        createdAt: DateTime.parse(map['createdAt'] as String),
+      );
+}
+
+===== lib\repositories\subject_repository.dart =====
+import 'package:sqflite/sqflite.dart';
+import '../models/subject.dart';
+import '../services/database_service.dart';
+
+class SubjectRepository {
+  final _db = DatabaseService.instance;
+
+  Future<void> create(Subject subject) async {
+    final db = await _db.database;
+    await db.insert('subjects', subject.toMap());
+  }
+
+  Future<void> update(Subject subject) async {
+    final db = await _db.database;
+    await db.update(
+      'subjects',
+      subject.toMap(),
+      where: 'id = ?',
+      whereArgs: [subject.id],
+    );
+  }
+
+  /// Deletes the subject. Related topics/sessions/tasks cascade via
+  /// the foreign keys in DatabaseService — callers should warn the
+  /// user before calling this (business rule from the V1 spec).
+  Future<void> delete(String id) async {
+    final db = await _db.database;
+    await db.delete('subjects', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Subject?> getById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query('subjects', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    return Subject.fromMap(rows.first);
+  }
+
+  Future<List<Subject>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('subjects', orderBy: 'createdAt ASC');
+    return rows.map(Subject.fromMap).toList();
+  }
+
+  /// Counts topics + sessions + tasks tied to a subject, so the UI can
+  /// show "this will also delete N related items" before confirming.
+  Future<int> countRelatedRecords(String subjectId) async {
+    final db = await _db.database;
+    final topics = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM topics WHERE subjectId = ?',
+      [subjectId],
+    ));
+    final sessions = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM study_sessions WHERE subjectId = ?',
+      [subjectId],
+    ));
+    final tasks = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM tasks WHERE subjectId = ?',
+      [subjectId],
+    ));
+    return (topics ?? 0) + (sessions ?? 0) + (tasks ?? 0);
+  }
+}
+
+===== lib\widgets\stat_card.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+/// Small metric tile used on Home (Subjects, Tasks today, Streak,
+/// Weekly goal) and reusable anywhere a single number needs a label.
+class StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData? icon;
+  final Color? accent;
+  /// Set true only for a card that's actually tappable (e.g. Weekly
+  /// goal opening Progress) — adds a small chevron so the card looks
+  /// interactive instead of being visually identical to the other,
+  /// non-tappable stat cards next to it.
+  final bool showsTapAffordance;
+
+  const StatCard({
+    super.key,
+    required this.label,
+    required this.value,
+    this.icon,
+    this.accent,
+    this.showsTapAffordance = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              // The label shrinks slightly instead of overflowing when a
+              // card is narrow (small phones, large system font sizes).
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+              if (showsTapAffordance) ...[
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.chevron_right,
+                  size: 14,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: accent ?? AppColors.accentPurpleStrong),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                value,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+===== lib\main.dart =====
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app/app.dart';
+import 'features/auth/auth_service.dart';
+import 'services/notification_service.dart';
+import 'services/sync_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Plain sqflite only ships a native database engine for Android/iOS.
+  // On Windows and Linux desktop there is no such engine bundled, so
+  // sqflite_common_ffi's databaseFactory must be installed explicitly
+  // before DatabaseService (or anything else) opens a database —
+  // otherwise every DB call throws "databaseFactory not initialized."
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  // V2: load Supabase credentials from .env and start the client.
+  // Wrapped in try/catch so a missing .env or a Supabase problem never
+  // stops the local-first app from launching.
+  try {
+    await dotenv.load(fileName: '.env');
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL']!,
+      publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    );
+    // Only flips to true when init fully succeeded. AuthGate reads this
+    // so it never touches Supabase.instance when the client isn't ready.
+    AuthService.isAvailable = true;
+    debugPrint('Supabase initialized OK');
+
+    // V2 Step 4: start local <-> cloud sync (does nothing until signed in).
+    SyncService.instance.start();
+  } catch (e) {
+    AuthService.isAvailable = false;
+    debugPrint('Supabase init failed: $e');
+  }
+
+  // Safe no-op on Web — see notification_service.dart for why.
+  await NotificationService.instance.init();
+  runApp(const StudyArchitectApp());
+}
+
+===== lib\app\app.dart =====
+import 'package:flutter/material.dart';
+import '../features/auth/auth_gate.dart';
+import '../theme/light_theme.dart';
+import '../theme/dark_theme.dart';
+import 'routes.dart';
+import 'theme_controller.dart';
+import 'route_observer.dart';
+
+class StudyArchitectApp extends StatefulWidget {
+  const StudyArchitectApp({super.key});
+
+  @override
+  State<StudyArchitectApp> createState() => _StudyArchitectAppState();
+}
+
+class _StudyArchitectAppState extends State<StudyArchitectApp> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Loads the saved theme preference (if onboarding has already
+    // happened) so the app opens in the right mode instead of
+    // flashing system default first.
+    ThemeController.instance.loadFromSettings();
+  }
+
+  /// V2: wraps the existing root route in AuthGate.
+  /// - Signed in (or Supabase unavailable) -> the original root screen,
+  ///   exactly what V1 showed.
+  /// - Signed out -> Sign In screen.
+  /// Every other route in AppRoutes.table is left untouched.
+  Map<String, WidgetBuilder> _buildRoutes() {
+    final originalRoot = AppRoutes.table[AppRoutes.root];
+
+    if (originalRoot == null) {
+      return AppRoutes.table;
+    }
+
+    return {
+      ...AppRoutes.table,
+      AppRoutes.root: (context) => AuthGate(
+            signedInBuilder: (gateContext) => originalRoot(gateContext),
+          ),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.instance.mode,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          title: 'Study Architect',
+          debugShowCheckedModeBanner: false,
+          theme: buildLightTheme(),
+          darkTheme: buildDarkTheme(),
+          themeMode: themeMode,
+          initialRoute: AppRoutes.root,
+          routes: _buildRoutes(),
+          navigatorObservers: [routeObserver],
+        );
+      },
+    );
+  }
+}
+
+===== lib\app\routes.dart =====
+import 'package:flutter/material.dart';
+import 'startup_decider.dart';
+import '../screens/timetable/plan_session_screen.dart';
+
+class AppRoutes {
+  AppRoutes._();
+
+  static const root = '/';
+  static const plan = '/plan';
+
+  static Map<String, WidgetBuilder> get table => {
+        root: (_) => const StartupDecider(),
+        plan: (_) => const PlanSessionScreen(),
+      };
+}
+
+===== lib\app\theme_controller.dart =====
+import 'package:flutter/material.dart';
+import '../repositories/settings_repository.dart';
+
+/// Single source of truth for the app's current ThemeMode. MaterialApp
+/// listens to [mode] directly, so calling [setMode] anywhere in the
+/// app (from the More/Settings screen) updates every screen
+/// immediately — no restart needed.
+class ThemeController {
+  ThemeController._internal();
+  static final ThemeController instance = ThemeController._internal();
+
+  final ValueNotifier<ThemeMode> mode = ValueNotifier(ThemeMode.system);
+  final _settingsRepo = SettingsRepository();
+
+  Future<void> loadFromSettings() async {
+    final settings = await _settingsRepo.get();
+    mode.value = settings.themeMode;
+  }
+
+  Future<void> setMode(ThemeMode newMode) async {
+    mode.value = newMode;
+    final current = await _settingsRepo.get();
+    await _settingsRepo.save(current.copyWith(themeMode: newMode));
+  }
+}
+
+===== lib\theme\app_theme.dart =====
+import 'package:flutter/material.dart';
+
+/// Design tokens for Study Architect V2 (teal-green + navy reference sheet).
+/// Single source of truth for colours. Estimated from the reference image:
+/// adjust the hex values here and the whole app follows.
+class AppColors {
+  AppColors._();
+
+  // Brand
+  static const primary = Color(0xFF16A37F);
+  static const primaryDark = Color(0xFF0E8A6B);
+  static const primarySoft = Color(0xFFD9F2EA);
+  static const teal = Color(0xFF1FD0B5);
+
+  // Page background gradients
+  static const backgroundGradientTop = Color(0xFFF1F7F6);
+  static const backgroundGradientBottom = Color(0xFFE4EEF2);
+  static const darkBackgroundGradientTop = Color(0xFF0F1B2E);
+  static const darkBackgroundGradientBottom = Color(0xFF0A1220);
+
+  // Surfaces
+  static const surfaceLight = Color(0xFFF7FAFA);
+  static const surfaceLightAlt = Color(0xFFFFFFFF);
+  static const surfaceDark = Color(0xFF16233A);
+  static const surfaceDarkAlt = Color(0xFF1B2A44);
+
+  // Tinted cards (classes, tasks, timetable events)
+  static const accentBlue = Color(0xFFDCE9FB);
+  static const accentPurple = Color(0xFFE9E1FA);
+  static const accentGreen = Color(0xFFD6F1E6);
+
+  // Saturated versions (timeline dots, charts, subject colours)
+  static const accentBlueStrong = Color(0xFF4C8DF6);
+  static const accentPurpleStrong = Color(0xFF8B6FE0);
+  static const accentGreenStrong = Color(0xFF1FB57F);
+
+  // Text
+  static const textPrimary = Color(0xFF14213D);
+  static const textSecondary = Color(0xFF6B7A90);
+  static const textPrimaryDark = Color(0xFFEAF1FA);
+  static const textSecondaryDark = Color(0xFF93A4BE);
+
+  // Nav bar
+  static const navInactive = Color(0xFFA9B5C4);
+  static const navInactiveDark = Color(0xFF56657F);
+
+  // Destructive actions
+  static const danger = Color(0xFFD64545);
+
+  // Theme-aware helpers
+  static bool isDark(BuildContext c) =>
+      Theme.of(c).brightness == Brightness.dark;
+  static Color primaryText(BuildContext c) =>
+      isDark(c) ? textPrimaryDark : textPrimary;
+  static Color secondaryText(BuildContext c) =>
+      isDark(c) ? textSecondaryDark : textSecondary;
+  static Color card(BuildContext c) =>
+      isDark(c) ? surfaceDarkAlt : surfaceLightAlt;
+}
+
+class AppRadii {
+  AppRadii._();
+  static const outer = 24.0;
+  static const card = 16.0;
+  static const cardSmall = 14.0;
+  static const control = 10.0;
+  static const button = 14.0;
+}
+
+class AppSpacing {
+  AppSpacing._();
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 24.0;
+}
+
+===== lib\theme\dark_theme.dart =====
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'app_theme.dart';
+
+ThemeData buildDarkTheme() {
+  final base = ThemeData.dark(useMaterial3: true);
+  final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+    bodyColor: AppColors.textPrimaryDark,
+    displayColor: AppColors.textPrimaryDark,
+  );
+
+  return base.copyWith(
+    scaffoldBackgroundColor: AppColors.darkBackgroundGradientTop,
+    textTheme: textTheme,
+    colorScheme: base.colorScheme.copyWith(
+      primary: AppColors.primary,
+      secondary: AppColors.accentBlueStrong,
+      surface: AppColors.surfaceDark,
+    ),
+    cardTheme: const CardThemeData(
+      color: AppColors.surfaceDarkAlt,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(AppRadii.card)),
+      ),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: AppColors.textPrimaryDark,
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.surfaceDarkAlt,
+      selectedItemColor: AppColors.textPrimaryDark,
+      unselectedItemColor: AppColors.navInactiveDark,
+      showSelectedLabels: false,
+      showUnselectedLabels: false,
+      type: BottomNavigationBarType.fixed,
+      elevation: 0,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.surfaceDarkAlt,
+        foregroundColor: AppColors.textPrimaryDark,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+      ),
+    ),
+  );
+}
+
+===== lib\theme\light_theme.dart =====
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'app_theme.dart';
+
+ThemeData buildLightTheme() {
+  final base = ThemeData.light(useMaterial3: true);
+  final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+    bodyColor: AppColors.textPrimary,
+    displayColor: AppColors.textPrimary,
+  );
+
+  return base.copyWith(
+    scaffoldBackgroundColor: AppColors.backgroundGradientTop,
+    textTheme: textTheme,
+    colorScheme: base.colorScheme.copyWith(
+      primary: AppColors.primary,
+      secondary: AppColors.accentBlueStrong,
+      surface: AppColors.surfaceLight,
+    ),
+    cardTheme: const CardThemeData(
+      color: AppColors.surfaceLightAlt,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(AppRadii.card)),
+      ),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: AppColors.textPrimary,
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.surfaceLightAlt,
+      selectedItemColor: AppColors.textPrimary,
+      unselectedItemColor: AppColors.navInactive,
+      showSelectedLabels: false,
+      showUnselectedLabels: false,
+      type: BottomNavigationBarType.fixed,
+      elevation: 0,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.surfaceLightAlt,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+      ),
+    ),
+  );
+}
+
+===== lib\theme\theme_helpers.dart =====
+import 'package:flutter/material.dart';
+import 'app_theme.dart';
+
+/// Shorthand for the isDark-branch pattern already used in
+/// StatCard/ProgressCard since Step 2 — lets every other screen pick
+/// up the same "dedicated dark scheme, not just inverted" behavior
+/// without repeating `Theme.of(context).brightness == Brightness.dark`
+/// everywhere.
+///
+/// Deliberately NOT used inside form input fields (TextField /
+/// DropdownButtonFormField fill colors and their typed-text color) —
+/// those stay a fixed light surface with fixed dark text in both
+/// themes, since that was a specific, already-debugged fix and
+/// switching it per-theme risks reintroducing invisible typed text.
+extension ThemeAwareColors on BuildContext {
+  bool get isDarkMode => Theme.of(this).brightness == Brightness.dark;
+
+  /// Plain info/stat card background — e.g. a settings row, a summary
+  /// box. Not for pastel accent cards, which stay the same hue in
+  /// both themes by design.
+  Color get cardSurface => isDarkMode ? AppColors.surfaceDark : AppColors.surfaceLight;
+
+  Color get cardSurfaceAlt => isDarkMode ? AppColors.surfaceDarkAlt : AppColors.surfaceLightAlt;
+
+  /// Body text sitting on a [cardSurface] (not on a pastel card, and
+  /// not typed text inside a form field).
+  Color get primaryText => isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary;
+
+  Color get secondaryText => isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary;
+}
+
+===== lib\screens\home\home_screen.dart =====
+import 'package:flutter/material.dart';
+import '../../app/route_observer.dart';
+import '../../core/data_refresh_bus.dart';
+import '../../core/refreshable_screen.dart';
+import '../../models/study_session.dart';
+import '../../models/subject.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+import '../../utils/date_utils.dart';
+import '../../widgets/class_card.dart';
+import '../../widgets/pastel_card.dart';
+import '../../widgets/schedule_row.dart';
+import '../../widgets/stat_card.dart';
+import '../../widgets/task_card.dart';
+import '../progress/progress_screen.dart';
+import '../session/focus_timer_screen.dart';
+import '../tasks/add_edit_task_screen.dart';
+import '../tasks/tasks_screen.dart';
+import '../timetable/timetable_screen.dart';
+import 'home_view_data.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen>
+    with
+        WidgetsBindingObserver,
+        RouteAware,
+        RefreshableScreenMixin<HomeScreen> {
+  late Future<HomeViewData> _future;
+
+  ModalRoute<dynamic>? _route;
+
+  /// Data scopes that should make Home reload itself automatically.
+  @override
+  List<RefreshScope> get watchedScopes => [
+        RefreshScope.sessions,
+        RefreshScope.tasks,
+        RefreshScope.subjects,
+        RefreshScope.achievements,
+      ];
+
+  @override
+  void initState() {
+    super.initState(); // RefreshableScreenMixin subscribes to the bus here.
+    WidgetsBinding.instance.addObserver(this);
+    _future = HomeViewData.load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final route = ModalRoute.of(context);
+
+    if (route != null && route != _route) {
+      if (_route != null) {
+        routeObserver.unsubscribe(this);
+      }
+
+      _route = route;
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose(); // RefreshableScreenMixin cancels its subscription here.
+  }
+
+  @override
+  void didPopNext() {
+    onRefresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      onRefresh();
+    }
+  }
+
+  /// Used by pull-to-refresh, the DataRefreshBus, returning from another
+  /// screen and app resume.
+  @override
+  Future<void> onRefresh() async {
+    final next = HomeViewData.load();
+
+    if (!mounted) {
+      next.ignore();
+      return;
+    }
+
+    setState(() => _future = next);
+
+    try {
+      await next;
+    } catch (_) {
+      // FutureBuilder handles the error state.
+    }
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  Future<void> _openScreen(Widget screen) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => screen),
+    );
+
+    if (mounted) {
+      await onRefresh();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<HomeViewData>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData && !snapshot.hasError) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return buildRefreshable(
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              children: [
+                const SizedBox(height: 120),
+                Center(
+                  child: Text(
+                    'Could not load your dashboard.\nPull down to try again.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final data = snapshot.data!;
+        final now = DateTime.now();
+        final weekStart = startOfWeek(now);
+        final weekDays = List<DateTime>.generate(
+          7,
+          (i) => DateTime(weekStart.year, weekStart.month, weekStart.day + i),
+        );
+
+        return buildRefreshable(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            // Extra bottom space so the last card is not hidden behind
+            // the floating bottom navigation bar.
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              96,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _HomeHeader(
+                  greeting: _greeting(),
+                  name: data.student.name,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                const _LevelXpPlaceholderCard(),
+                const SizedBox(height: AppSpacing.md),
+                _TodayProgressCard(
+                  current: formatDuration(data.todayMinutes),
+                  target: formatDuration(data.dailyGoalMinutes),
+                  percent: data.todayProgress,
+                  note: data.todayProgress >= 1
+                      ? 'Goal reached! Great work.'
+                      : 'Keep going! ${(data.todayProgress * 100).round()}%',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _StreakStrip(
+                  streak: data.streak,
+                  weekDays: weekDays,
+                  today: now,
+                  studiedOn: data.studiedOn,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatCard(
+                        label: 'Subjects',
+                        value: '${data.subjectsCount}',
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _openScreen(const TasksScreen()),
+                        child: StatCard(
+                          label: 'Tasks today',
+                          value: '${data.tasksTodayCount}',
+                          showsTapAffordance: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _openScreen(const ProgressScreen()),
+                        child: StatCard(
+                          label: 'Weekly goal',
+                          value: '${data.weeklyGoalPercent}%',
+                          showsTapAffordance: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const _AiSuggestionCard(),
+                const SizedBox(height: AppSpacing.lg),
+                if (_currentOrNextSession(data) != null) ...[
+                  _buildClassCard(data),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
+                if (data.todayTasks.isNotEmpty) ...[
+                  _SectionHeader(
+                    title: "Today's tasks",
+                    onViewAll: () => _openScreen(const TasksScreen()),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ...data.todayTasks.take(3).map((task) {
+                    final subject = data.subjectsById[task.subjectId];
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: TaskCard(
+                        subject: subject?.name ?? 'Unknown subject',
+                        title: task.title,
+                        meta: task.completed ? 'Done' : 'Due today',
+                        hue: _hueForSubject(subject),
+                        completed: task.completed,
+                        onTap: () => _openScreen(
+                          AddEditTaskScreen(existing: task),
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
+                if (data.todaySessions.isNotEmpty) ...[
+                  _SectionHeader(
+                    title: "Today's schedule",
+                    onViewAll: () => _openScreen(
+                      const TimetableScreen(standalone: true),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ...data.todaySessions.map((session) {
+                    final subject = data.subjectsById[session.subjectId];
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: ScheduleRow(
+                        title: subject?.name ?? 'Unknown subject',
+                        timeRange:
+                            '${formatTimeOfDay(session.startTime)} - ${formatTimeOfDay(session.endTime)}',
+                        accent: subject != null
+                            ? Color(subject.colorValue)
+                            : AppColors.primary,
+                      ),
+                    );
+                  }),
+                ] else
+                  Text(
+                    'No sessions scheduled today — tap + to plan one.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: context.secondaryText,
+                        ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// The session currently running, or the next upcoming one today.
+  _SessionAndSubject? _currentOrNextSession(HomeViewData data) {
+    final now = DateTime.now();
+
+    final sorted = [...data.todaySessions]
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    for (final session in sorted) {
+      if (session.endTime.isAfter(now)) {
+        return _SessionAndSubject(
+          session,
+          data.subjectsById[session.subjectId],
+        );
+      }
+    }
+
+    return null;
+  }
+
+  Widget _buildClassCard(HomeViewData data) {
+    final match = _currentOrNextSession(data)!;
+    final session = match.session;
+    final subject = match.subject;
+    final now = DateTime.now();
+
+    final isLive =
+        session.startTime.isBefore(now) && session.endTime.isAfter(now);
+
+    return ClassCard(
+      timeRange:
+          '${formatTimeOfDay(session.startTime)} - ${formatTimeOfDay(session.endTime)}',
+      title: subject?.name ?? 'Unknown subject',
+      hue: _hueForSubject(subject),
+      actionLabel: isLive ? 'Start session' : 'View details',
+      onAction: isLive
+          ? () => _openScreen(
+                FocusTimerScreen(
+                  subjectId: session.subjectId,
+                  subjectName: subject?.name ?? 'Unknown subject',
+                  subjectColorValue:
+                      subject?.colorValue ?? AppColors.accentPurpleStrong.value,
+                  topicId: session.topicId,
+                  existingSessionId: session.id,
+                  goal: session.endTime.difference(session.startTime),
+                ),
+              )
+          : () {},
+    );
+  }
+
+  PastelHue _hueForSubject(Subject? subject) {
+    if (subject == null) {
+      return PastelHue.blue;
+    }
+
+    final color = subject.colorValue;
+
+    if (color == AppColors.accentGreenStrong.value) {
+      return PastelHue.green;
+    }
+
+    if (color == AppColors.accentBlueStrong.value) {
+      return PastelHue.blue;
+    }
+
+    return PastelHue.purple;
+  }
+}
+
+class _SessionAndSubject {
+  final StudySession session;
+  final Subject? subject;
+
+  const _SessionAndSubject(this.session, this.subject);
+}
+
+/// "Good morning" + student name, with an initial-letter avatar.
+/// TODO(step 15): replace the initial with the real profile photo.
+class _HomeHeader extends StatelessWidget {
+  final String greeting;
+  final String name;
+
+  const _HomeHeader({required this.greeting, required this.name});
+
+  String _initial() {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '?';
+    return String.fromCharCode(trimmed.runes.first).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.primary, AppColors.teal],
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            _initial(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                greeting,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: context.secondaryText,
+                ),
+              ),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Placeholder for the level / XP header.
+/// TODO(step 13): show the real level and XP from the gamification engine.
+class _LevelXpPlaceholderCard extends StatelessWidget {
+  const _LevelXpPlaceholderCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: context.cardSurfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withValues(alpha: 0.15),
+            ),
+            child: const Icon(
+              Icons.bolt_rounded,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Level & XP',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Coming soon',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: context.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: 0,
+                    minHeight: 6,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                    valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Green hero card: studied time today vs the daily goal.
+class _TodayProgressCard extends StatelessWidget {
+  final String current;
+  final String target;
+  final double percent;
+  final String note;
+
+  const _TodayProgressCard({
+    required this.current,
+    required this.target,
+    required this.percent,
+    required this.note,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final softWhite = Colors.white.withValues(alpha: 0.85);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primaryDark, AppColors.primary],
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "Today's progress",
+            style: theme.textTheme.bodySmall?.copyWith(color: softWhite),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                current,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '/ $target',
+                style: theme.textTheme.bodyMedium?.copyWith(color: softWhite),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: percent.clamp(0.0, 1.0),
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.25),
+              valueColor: const AlwaysStoppedAnimation(Colors.white),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            note,
+            style: theme.textTheme.bodySmall?.copyWith(color: softWhite),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Current streak plus the 7 days of this week (Monday to Sunday).
+class _StreakStrip extends StatelessWidget {
+  final int streak;
+  final List<DateTime> weekDays;
+  final DateTime today;
+  final bool Function(DateTime day) studiedOn;
+
+  const _StreakStrip({
+    required this.streak,
+    required this.weekDays,
+    required this.today,
+    required this.studiedOn,
+  });
+
+  static const _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final title = streak == 0
+        ? 'Start your streak today'
+        : streak == 1
+            ? '1 day streak'
+            : '$streak day streak';
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: context.cardSurfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.local_fire_department_rounded,
+                color: AppColors.primary,
+                size: 22,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(7, (i) => _dayCell(context, i)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dayCell(BuildContext context, int index) {
+    final day = weekDays[index];
+    final studied = studiedOn(day);
+    final isToday = isSameDay(day, today);
+
+    final neutralFill = context.isDarkMode
+        ? Colors.white.withValues(alpha: 0.08)
+        : AppColors.primary.withValues(alpha: 0.08);
+
+    return Column(
+      children: [
+        Text(
+          _labels[index],
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.secondaryText,
+                fontWeight: isToday ? FontWeight.w700 : FontWeight.w400,
+              ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: studied ? AppColors.primary : neutralFill,
+            border: isToday && !studied
+                ? Border.all(color: AppColors.primary, width: 2)
+                : null,
+          ),
+          child: studied
+              ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
+/// Placeholder slot for the AI study suggestion.
+/// TODO(step 14): fill with pattern-based suggestions.
+class _AiSuggestionCard extends StatelessWidget {
+  const _AiSuggestionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: context.cardSurfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.teal.withValues(alpha: 0.18),
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: AppColors.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Study suggestion',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Personalised tips based on your study habits will appear here.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: context.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final VoidCallback onViewAll;
+
+  const _SectionHeader({required this.title, required this.onViewAll});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        GestureDetector(
+          onTap: onViewAll,
+          child: Text(
+            'View all',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.primary,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+===== lib\screens\home\home_view_data.dart =====
+import '../../models/student.dart';
+import '../../models/study_session.dart';
+import '../../models/subject.dart';
+import '../../models/task.dart';
+import '../../repositories/session_repository.dart';
+import '../../repositories/student_repository.dart';
+import '../../repositories/subject_repository.dart';
+import '../../repositories/task_repository.dart';
+import '../../utils/date_utils.dart';
+import '../../utils/study_stats.dart';
+
+/// Everything the Home screen needs, loaded in one pass so the UI
+/// never has to juggle five separate FutureBuilders.
+class HomeViewData {
+  final Student student;
+  final int todayMinutes;
+  final int dailyGoalMinutes;
+  final int weeklyMinutes;
+  final int weeklyGoalMinutes;
+  final int subjectsCount;
+  final int tasksTodayCount;
+  final int streak;
+  final List<StudySession> todaySessions;
+  final Map<String, Subject> subjectsById;
+  final List<Task> todayTasks;
+
+  /// Days (yyyy-MM-dd) with at least one completed session. Powers the
+  /// 7-day streak strip on Home (V2 step 6).
+  final Set<String> completedDates;
+
+  const HomeViewData({
+    required this.student,
+    required this.todayMinutes,
+    required this.dailyGoalMinutes,
+    required this.weeklyMinutes,
+    required this.weeklyGoalMinutes,
+    required this.subjectsCount,
+    required this.tasksTodayCount,
+    required this.streak,
+    required this.todaySessions,
+    required this.subjectsById,
+    required this.todayTasks,
+    this.completedDates = const <String>{},
+  });
+
+  double get todayProgress => dailyGoalMinutes == 0
+      ? 0
+      : (todayMinutes / dailyGoalMinutes).clamp(0.0, 1.0);
+
+  int get weeklyGoalPercent => weeklyGoalMinutes == 0
+      ? 0
+      : ((weeklyMinutes / weeklyGoalMinutes) * 100).round();
+
+  /// True when [day] has at least one completed study session.
+  bool studiedOn(DateTime day) => completedDates.contains(_dateKey(day));
+
+  static String _dateKey(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  static Future<HomeViewData> load() async {
+    final studentRepo = StudentRepository();
+    final subjectRepo = SubjectRepository();
+    final sessionRepo = SessionRepository();
+    final taskRepo = TaskRepository();
+
+    final now = DateTime.now();
+    final weekStart = startOfWeek(now);
+    final weekEnd = endOfWeek(now);
+
+    final student = await studentRepo.getCurrent();
+    if (student == null) {
+      throw StateError(
+          'HomeViewData.load() called before onboarding completed.');
+    }
+
+    final subjects = await subjectRepo.getAll();
+    final subjectsById = {for (final s in subjects) s.id: s};
+
+    final todaySessions = await sessionRepo.getForDate(now);
+    final weekSessions = await sessionRepo.getForRange(weekStart, weekEnd);
+    final todayTasks = await taskRepo.getForDate(now);
+    final completedDates = await sessionRepo.getCompletedDates();
+
+    return HomeViewData(
+      student: student,
+      todayMinutes: completedMinutesForDate(todaySessions, now),
+      dailyGoalMinutes: student.dailyGoalMinutes,
+      weeklyMinutes: completedMinutesTotal(weekSessions),
+      weeklyGoalMinutes: student.weeklyGoalMinutes,
+      subjectsCount: subjects.length,
+      tasksTodayCount: todayTasks.where((t) => !t.completed).length,
+      streak: currentStreak(completedDates, today: now),
+      todaySessions: todaySessions,
+      subjectsById: subjectsById,
+      todayTasks: todayTasks,
+      completedDates: completedDates,
+    );
+  }
+}
+
+
+===== lib\screens\more\more_screen.dart =====
+import 'package:flutter/material.dart';
+
+import '../../app/theme_controller.dart';
+import '../../repositories/settings_repository.dart';
+import '../../services/notification_service.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+import '../../utils/date_utils.dart';
+import '../../widgets/async_builder.dart';
+import '../../features/auth/auth_service.dart';
+import '../../features/auth/password_prompt_card.dart';
+import '../../features/auth/set_password_screen.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import '../../features/auth/auth_diagnostics_screen.dart';
+import '../progress/progress_screen.dart';
+import '../tasks/tasks_screen.dart';
+import 'backup_screen.dart';
+import 'edit_goals_screen.dart';
+import 'edit_profile_screen.dart';
+import 'more_view_data.dart';
+
+class MoreScreen extends StatefulWidget {
+  const MoreScreen({super.key});
+
+  @override
+  State<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends State<MoreScreen>
+    with WidgetsBindingObserver {
+  late Future<MoreViewData> _future;
+
+  final _settingsRepo = SettingsRepository();
+
+  bool? _notificationOverride;
+  bool _isUpdatingNotifications = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
+    _future = MoreViewData.load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reload();
+    }
+  }
+
+  Future<void> _reload() async {
+    final next = MoreViewData.load();
+
+    if (!mounted) return;
+
+    setState(() {
+      _future = next;
+    });
+
+    try {
+      await next;
+
+      if (!mounted) return;
+
+      setState(() {
+        _notificationOverride = null;
+      });
+    } catch (_) {
+      // AsyncBuilder handles the error state.
+    }
+  }
+
+  Future<void> _toggleNotifications(bool enabled) async {
+    if (_isUpdatingNotifications) return;
+
+    setState(() {
+      _notificationOverride = enabled;
+      _isUpdatingNotifications = true;
+    });
+
+    try {
+      final current = await _settingsRepo.get();
+
+      await _settingsRepo.save(
+        current.copyWith(
+          notificationsEnabled: enabled,
+        ),
+      );
+
+      try {
+        if (enabled) {
+          await NotificationService.instance.scheduleDailyGoalReminder(
+            const TimeOfDay(hour: 19, minute: 0),
+          );
+        } else {
+          await NotificationService.instance.cancelDailyGoalReminder();
+        }
+      } catch (_) {
+        // The setting was already saved.
+        // A notification-service failure should not undo the UI change.
+      }
+
+      if (!mounted) return;
+
+      final next = MoreViewData.load();
+
+      setState(() {
+        _future = next;
+      });
+
+      try {
+        await next;
+      } catch (_) {
+        // AsyncBuilder handles the error state.
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _notificationOverride = null;
+        _isUpdatingNotifications = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _notificationOverride = null;
+        _isUpdatingNotifications = false;
+      });
+
+      await _reload();
+    }
+  }
+
+  /// Asks for confirmation, then signs out through Supabase.
+  /// AuthGate listens to the auth stream and switches to the Sign In
+  /// screen by itself, so no manual navigation is needed here.
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'You will need to sign in again to use your account on this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text(
+              'Sign out',
+              style: TextStyle(color: Color(0xFFD64545)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await AuthService.instance.signOut();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AuthService.friendlyError(e))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AsyncBuilder<MoreViewData>(
+      future: _future,
+      errorMessage: 'Could not load your profile.',
+      onRetry: _reload,
+      builder: (context, data) {
+        final student = data.student;
+
+        final notificationsEnabled =
+            _notificationOverride ?? data.settings.notificationsEnabled;
+
+        // Only show the Sign out card when Supabase is running and
+        // someone is actually signed in.
+        final authUser =
+            AuthService.isAvailable ? AuthService.instance.currentUser : null;
+
+        return RefreshIndicator(
+          onRefresh: _reload,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg + MediaQuery.of(context).padding.bottom + 96,
+            ),
+            children: [
+              Text(
+                'More',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              
+
+              const PasswordPromptCard(),
+
+              _SectionCard(
+                onTap: () async {
+                  final changed = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => EditProfileScreen(
+                        student: student,
+                      ),
+                    ),
+                  );
+
+                  if (changed == true && mounted) {
+                    await _reload();
+                  }
+                },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.accentPurpleStrong,
+                      child: Text(
+                        student.name.isNotEmpty
+                            ? student.name[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            student.name,
+                            style: TextStyle(
+                              color: context.primaryText,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Level ${student.level} • ${student.program}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                onTap: () async {
+                  final changed = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => EditGoalsScreen(
+                        student: student,
+                      ),
+                    ),
+                  );
+
+                  if (changed == true && mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Study Goals',
+                  'Daily ${formatDuration(student.dailyGoalMinutes)} • '
+                      'Weekly ${formatDuration(student.weeklyGoalMinutes)}',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Notifications',
+                      style: TextStyle(
+                        color: context.primaryText,
+                      ),
+                    ),
+                    Switch(
+                      value: notificationsEnabled,
+                      activeColor: AppColors.accentPurpleStrong,
+                      onChanged: _isUpdatingNotifications
+                          ? null
+                          : _toggleNotifications,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Appearance',
+                      style: TextStyle(
+                        color: context.primaryText,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ValueListenableBuilder<ThemeMode>(
+                      valueListenable: ThemeController.instance.mode,
+                      builder: (context, mode, _) {
+                        return SegmentedButton<ThemeMode>(
+                          segments: const [
+                            ButtonSegment(
+                              value: ThemeMode.system,
+                              label: Text('System'),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.light,
+                              label: Text('Light'),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.dark,
+                              label: Text('Dark'),
+                            ),
+                          ],
+                          selected: {mode},
+                          onSelectionChanged: (s) {
+                            ThemeController.instance.setMode(s.first);
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ProgressScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Progress',
+                  'Charts, streak, insights',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+              _SectionCard(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TasksScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Tasks',
+                  'Assignments, readings, revision',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BackupScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Data & Backup',
+                  'Export or import',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              // ---- V2: set or change password ----
+              if (authUser != null) ...[
+                _SectionCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SetPasswordScreen(),
+                    ),
+                  ),
+                  child: _rowLabelValue('Password', 'Set or change'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              // ---- V2: debug-only auth diagnostics ----
+              if (kDebugMode) ...[
+                _SectionCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AuthDiagnosticsScreen(),
+                    ),
+                  ),
+                  child: _rowLabelValue('Auth diagnostics', 'Debug only'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              // ---- V2: Account / Sign out ----
+              if (authUser != null) ...[
+                _SectionCard(
+                  onTap: _confirmSignOut,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.logout_rounded,
+                        color: Color(0xFFD64545),
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Sign out',
+                              style: TextStyle(
+                                color: Color(0xFFD64545),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if ((authUser.email ?? '').isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                authUser.email!,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              _SectionCard(
+                onTap: () {
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Study Architect',
+                    applicationVersion: 'V1',
+                    children: const [
+                      Text(
+                        'A local-first study planning and tracking app.',
+                      ),
+                    ],
+                  );
+                },
+                child: _rowLabelValue(
+                  'About',
+                  'Study Architect V1',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _rowLabelValue(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: context.primaryText,
+          ),
+        ),
+        Row(
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textSecondary,
+              size: 18,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _SectionCard({
+    required this.child,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final card = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: child,
+    );
+
+    if (onTap == null) {
+      return card;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: onTap,
+        child: card,
+      ),
+    );
+  }
+}
+
+===== lib\screens\more\more_view_data.dart =====
+import '../../models/settings.dart';
+import '../../models/student.dart';
+import '../../repositories/settings_repository.dart';
+import '../../repositories/student_repository.dart';
+
+class MoreViewData {
+  final Student student;
+  final AppSettings settings;
+
+  const MoreViewData({required this.student, required this.settings});
+
+  static Future<MoreViewData> load() async {
+    final student = await StudentRepository().getCurrent();
+    final settings = await SettingsRepository().get();
+    if (student == null) {
+      throw StateError('MoreViewData.load() called before onboarding completed.');
+    }
+    return MoreViewData(student: student, settings: settings);
+  }
+}
+
+===== NOT FOUND =====
+*router*.dart
