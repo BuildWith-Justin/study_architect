@@ -51,12 +51,10 @@ class AddEditSessionScreen extends StatefulWidget {
   });
 
   @override
-  State<AddEditSessionScreen> createState() =>
-      _AddEditSessionScreenState();
+  State<AddEditSessionScreen> createState() => _AddEditSessionScreenState();
 }
 
-class _AddEditSessionScreenState
-    extends State<AddEditSessionScreen> {
+class _AddEditSessionScreenState extends State<AddEditSessionScreen> {
   final _subjectRepo = SubjectRepository();
   final _topicRepo = TopicRepository();
   final _sessionRepo = SessionRepository();
@@ -97,10 +95,7 @@ class _AddEditSessionScreenState
 
     final existing = widget.existing;
 
-    _date =
-        existing?.scheduledDate ??
-        widget.initialDate ??
-        DateTime.now();
+    _date = existing?.scheduledDate ?? widget.initialDate ?? DateTime.now();
 
     // Default series length: 12 weekly sessions.
     _repeatUntil = DateTime(_date.year, _date.month, _date.day + 77);
@@ -128,8 +123,7 @@ class _AddEditSessionScreenState
 
       setState(() {
         _subjects = subjects;
-        _subjectId ??=
-            subjects.isNotEmpty ? subjects.first.id : null;
+        _subjectId ??= subjects.isNotEmpty ? subjects.first.id : null;
         _loading = false;
       });
 
@@ -148,8 +142,7 @@ class _AddEditSessionScreenState
 
   Future<void> _loadTopics(String subjectId) async {
     try {
-      final topics =
-          await _topicRepo.getForSubject(subjectId);
+      final topics = await _topicRepo.getForSubject(subjectId);
 
       if (!mounted) return;
 
@@ -257,8 +250,7 @@ class _AddEditSessionScreenState
   }) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime:
-          isStart ? _startTime : _endTime,
+      initialTime: isStart ? _startTime : _endTime,
     );
 
     if (picked == null || !mounted) return;
@@ -348,8 +340,7 @@ class _AddEditSessionScreenState
 
     if (!base.isTimeRangeValid) {
       setState(() {
-        _error =
-            'End time must be after start time.';
+        _error = 'End time must be after start time.';
       });
       return;
     }
@@ -405,8 +396,7 @@ class _AddEditSessionScreenState
 
       setState(() {
         _saving = false;
-        _error =
-            'Could not save the session. Please try again.';
+        _error = 'Could not save the session. Please try again.';
       });
     }
   }
@@ -424,13 +414,11 @@ class _AddEditSessionScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(context, true),
               child: const Text(
                 'Delete',
                 style: TextStyle(
@@ -441,9 +429,7 @@ class _AddEditSessionScreenState
           ],
         ),
       );
-      return confirmed == true
-          ? _DeleteChoice.onlyThis
-          : _DeleteChoice.cancel;
+      return confirmed == true ? _DeleteChoice.onlyThis : _DeleteChoice.cancel;
     }
 
     final choice = await showDialog<_DeleteChoice>(
@@ -455,13 +441,11 @@ class _AddEditSessionScreenState
         ),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.pop(context, _DeleteChoice.cancel),
+            onPressed: () => Navigator.pop(context, _DeleteChoice.cancel),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.pop(context, _DeleteChoice.onlyThis),
+            onPressed: () => Navigator.pop(context, _DeleteChoice.onlyThis),
             child: const Text(
               'Only this session',
               style: TextStyle(color: Colors.redAccent),
@@ -511,8 +495,7 @@ class _AddEditSessionScreenState
       if (!mounted) return;
 
       setState(() {
-        _error =
-            'Could not delete the session. Please try again.';
+        _error = 'Could not delete the session. Please try again.';
       });
     }
   }
@@ -596,9 +579,7 @@ class _AddEditSessionScreenState
             children: [
               AppBar(
                 title: Text(
-                  _isEditing
-                      ? 'Edit session'
-                      : 'Plan your next study block',
+                  _isEditing ? 'Edit session' : 'Plan your next study block',
                 ),
                 leading: const BackButton(),
                 actions: [
@@ -607,55 +588,45 @@ class _AddEditSessionScreenState
                       icon: const Icon(
                         Icons.delete_outline,
                       ),
-                      onPressed:
-                          _saving ? null : _delete,
+                      onPressed: _saving ? null : _delete,
                     ),
                 ],
               ),
               if (_loading)
                 const Expanded(
                   child: Center(
-                    child:
-                        CircularProgressIndicator(),
+                    child: CircularProgressIndicator(),
                   ),
                 )
               else
                 Expanded(
                   child: ListView(
-                    padding:
-                        const EdgeInsets.all(
+                    padding: const EdgeInsets.all(
                       AppSpacing.lg,
                     ),
                     children: [
                       if (_subjects.isEmpty)
                         Text(
                           'Add a subject first (Subjects tab) before planning a session.',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(
-                                color:
-                                    AppColors.textSecondary,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
                         )
                       else ...[
                         _FieldLabel('Subject'),
                         DropdownButtonFormField<String>(
                           value: _subjectId,
-                          decoration:
-                              _fieldDecoration(),
+                          decoration: _fieldDecoration(),
                           style: const TextStyle(
-                            color:
-                                AppColors.textPrimary,
+                            color: AppColors.textPrimary,
                             fontSize: 15,
                           ),
                           items: _subjects
                               .map(
-                                (s) =>
-                                    DropdownMenuItem(
+                                (s) => DropdownMenuItem(
                                   value: s.id,
-                                  child:
-                                      Text(s.name),
+                                  child: Text(s.name),
                                 ),
                               )
                               .toList(),
@@ -680,11 +651,9 @@ class _AddEditSessionScreenState
                         ),
                         DropdownButtonFormField<String?>(
                           value: _topicId,
-                          decoration:
-                              _fieldDecoration(),
+                          decoration: _fieldDecoration(),
                           style: const TextStyle(
-                            color:
-                                AppColors.textPrimary,
+                            color: AppColors.textPrimary,
                             fontSize: 15,
                           ),
                           items: [
@@ -693,11 +662,9 @@ class _AddEditSessionScreenState
                               child: Text('None'),
                             ),
                             ..._topics.map(
-                              (t) =>
-                                  DropdownMenuItem(
+                              (t) => DropdownMenuItem(
                                 value: t.id,
-                                child:
-                                    Text(t.name),
+                                child: Text(t.name),
                               ),
                             ),
                           ],
@@ -722,17 +689,14 @@ class _AddEditSessionScreenState
                           children: [
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _FieldLabel('Start'),
                                   _TapField(
-                                    label:
-                                        _formatTime(
+                                    label: _formatTime(
                                       _startTime,
                                     ),
-                                    onTap: () =>
-                                        _pickTime(
+                                    onTap: () => _pickTime(
                                       isStart: true,
                                     ),
                                   ),
@@ -744,17 +708,14 @@ class _AddEditSessionScreenState
                             ),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _FieldLabel('End'),
                                   _TapField(
-                                    label:
-                                        _formatTime(
+                                    label: _formatTime(
                                       _endTime,
                                     ),
-                                    onTap: () =>
-                                        _pickTime(
+                                    onTap: () => _pickTime(
                                       isStart: false,
                                     ),
                                   ),
@@ -772,17 +733,13 @@ class _AddEditSessionScreenState
                         ),
                         _FieldLabel('Notes'),
                         TextField(
-                          controller:
-                              _notesController,
+                          controller: _notesController,
                           maxLines: 3,
                           style: const TextStyle(
-                            color:
-                                AppColors.textPrimary,
+                            color: AppColors.textPrimary,
                           ),
-                          decoration:
-                              _fieldDecoration(
-                            hint:
-                                'Practice integration questions',
+                          decoration: _fieldDecoration(
+                            hint: 'Practice integration questions',
                           ),
                         ),
                         if (_error != null) ...[
@@ -791,10 +748,8 @@ class _AddEditSessionScreenState
                           ),
                           Text(
                             _error!,
-                            style:
-                                const TextStyle(
-                              color:
-                                  Colors.redAccent,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
                             ),
                           ),
                         ],
@@ -802,12 +757,8 @@ class _AddEditSessionScreenState
                           height: AppSpacing.xl,
                         ),
                         PrimaryButton(
-                          label: _saving
-                              ? 'Saving...'
-                              : 'Save Session',
-                          onPressed: _saving
-                              ? null
-                              : _save,
+                          label: _saving ? 'Saving...' : 'Save Session',
+                          onPressed: _saving ? null : _save,
                         ),
                       ],
                     ],
@@ -828,8 +779,7 @@ class _AddEditSessionScreenState
       filled: true,
       fillColor: AppColors.surfaceLight,
       border: OutlineInputBorder(
-        borderRadius:
-            BorderRadius.circular(
+        borderRadius: BorderRadius.circular(
           AppRadii.control,
         ),
         borderSide: BorderSide.none,
@@ -846,16 +796,11 @@ class _FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(
-              color:
-                  AppColors.textSecondary,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
             ),
       ),
     );
@@ -875,21 +820,18 @@ class _TapField extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius:
-          BorderRadius.circular(
+      borderRadius: BorderRadius.circular(
         AppRadii.control,
       ),
       child: Container(
         width: double.infinity,
-        padding:
-            const EdgeInsets.symmetric(
+        padding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 14,
         ),
         decoration: BoxDecoration(
           color: AppColors.surfaceLight,
-          borderRadius:
-              BorderRadius.circular(
+          borderRadius: BorderRadius.circular(
             AppRadii.control,
           ),
         ),

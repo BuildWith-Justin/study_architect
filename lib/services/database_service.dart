@@ -1,4 +1,3 @@
-
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -12,7 +11,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'study_architect.db';
-  static const _dbVersion = 4;
+  static const _dbVersion = 5;
 
   Database? _db;
 
@@ -30,11 +29,13 @@ class DatabaseService {
       onCreate: (db, version) async {
         await _createSchema(db, version);
         await applySyncSchema(db);
+        await _addExams(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await applySyncSchema(db);
         if (oldVersion < 3) await _addSessionRecurrence(db);
         if (oldVersion < 4) await _addTopicSortOrder(db);
+        if (oldVersion < 5) await _addExams(db);
       },
       // sqflite does not enforce foreign keys by default — turn them on
       // so the ON DELETE CASCADE / SET NULL rules above actually run.
@@ -81,6 +82,45 @@ class DatabaseService {
         WHERE t2.subjectId = topics.subjectId AND t2.rowid < topics.rowid
       )
     ''');
+  }
+
+  /// V2 Step 11: exam mode. An exam belongs to a subject; exam_topics is
+  /// its preparation checklist (which topics, and whether each one is
+  /// prepared). Both tables are synced to the cloud.
+  Future<void> _addExams(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exams (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        title TEXT NOT NULL,
+        examDate TEXT NOT NULL,
+        location TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exam_topics (
+        id TEXT PRIMARY KEY,
+        examId TEXT NOT NULL,
+        topicId TEXT NOT NULL,
+        prepared INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (examId, topicId),
+        FOREIGN KEY (examId) REFERENCES exams (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_exams_date ON exams (examDate)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_exam_topics_exam ON exam_topics (examId)',
+    );
+
+    await applyExamSyncSchema(db);
   }
 
   Future<void> _createSchema(Database db, int version) async {
@@ -168,6 +208,8 @@ class DatabaseService {
   /// "Clear All Data" danger-zone action in Step 14.
   Future<void> clearAllData() async {
     final db = await database;
+    await db.delete('exam_topics');
+    await db.delete('exams');
     await db.delete('tasks');
     await db.delete('study_sessions');
     await db.delete('topics');
@@ -189,9 +231,13 @@ class DatabaseService {
     required List<Map<String, dynamic>> topics,
     required List<Map<String, dynamic>> sessions,
     required List<Map<String, dynamic>> tasks,
+    List<Map<String, dynamic>> exams = const [],
+    List<Map<String, dynamic>> examTopics = const [],
   }) async {
     final db = await database;
     await db.transaction((txn) async {
+      await txn.delete('exam_topics');
+      await txn.delete('exams');
       await txn.delete('tasks');
       await txn.delete('study_sessions');
       await txn.delete('topics');
@@ -216,6 +262,12 @@ class DatabaseService {
       }
       for (final row in tasks) {
         await txn.insert('tasks', row);
+      }
+      for (final row in exams) {
+        await txn.insert('exams', row);
+      }
+      for (final row in examTopics) {
+        await txn.insert('exam_topics', row);
       }
     });
   }

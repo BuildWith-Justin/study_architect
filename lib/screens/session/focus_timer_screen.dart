@@ -515,9 +515,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
                 child: OutlinedButton.icon(
                   onPressed: _ending ? null : _togglePause,
                   icon: Icon(
-                    _isPaused
-                        ? Icons.play_arrow_rounded
-                        : Icons.pause_rounded,
+                    _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                   ),
                   label: Text(
                     _isPaused ? 'Resume' : 'Pause',

@@ -8,7 +8,8 @@ DateTime startOfWeek(DateTime date) {
   return day.subtract(Duration(days: day.weekday - DateTime.monday));
 }
 
-DateTime endOfWeek(DateTime date) => startOfWeek(date).add(const Duration(days: 7));
+DateTime endOfWeek(DateTime date) =>
+    startOfWeek(date).add(const Duration(days: 7));
 
 bool isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;

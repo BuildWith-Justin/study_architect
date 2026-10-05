@@ -1,4 +1,3 @@
-
 class Topic {
   final String id;
   final String subjectId;

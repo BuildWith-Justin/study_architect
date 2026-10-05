@@ -137,7 +137,8 @@ class _TimetableScreenState extends State<TimetableScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Timetable', style: Theme.of(context).textTheme.headlineSmall),
+              Text('Timetable',
+                  style: Theme.of(context).textTheme.headlineSmall),
               IconButton(
                 icon: const Icon(
                   Icons.add_circle_rounded,
@@ -234,8 +235,7 @@ class _TimetableScreenState extends State<TimetableScreen>
                           ? week.topicsById[session.topicId]
                           : null;
 
-                      final status =
-                          session.complete ? 'Completed' : 'Planned';
+                      final status = session.complete ? 'Completed' : 'Planned';
 
                       return TimelineEventCard(
                         timeRange:
@@ -275,7 +275,8 @@ class _TimetableScreenState extends State<TimetableScreen>
         child: SafeArea(
           child: Column(
             children: [
-              AppBar(title: const Text('Timetable'), leading: const BackButton()),
+              AppBar(
+                  title: const Text('Timetable'), leading: const BackButton()),
               Expanded(child: content),
             ],
           ),
@@ -287,12 +288,32 @@ class _TimetableScreenState extends State<TimetableScreen>
   String _weekRangeLabel(DateTime weekStart) {
     final weekEnd = weekStart.add(const Duration(days: 6));
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     const shortMonths = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
 
     if (weekStart.month == weekEnd.month) {
@@ -327,7 +348,8 @@ class _DaySelector extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(7, (i) {
-        final day = DateTime(weekStart.year, weekStart.month, weekStart.day + i);
+        final day =
+            DateTime(weekStart.year, weekStart.month, weekStart.day + i);
         final selected = isSameDay(day, selectedDay);
         final isToday = isSameDay(day, DateTime.now());
         final busy = hasSessions(day);

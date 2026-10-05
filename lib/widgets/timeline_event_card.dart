@@ -87,14 +87,16 @@ class TimelineEventCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           subtitle,
-                          style: TextStyle(fontSize: 12, color: strong.withOpacity(0.85)),
+                          style: TextStyle(
+                              fontSize: 12, color: strong.withOpacity(0.85)),
                         ),
                         const SizedBox(height: 6),
                         Align(
                           alignment: Alignment.centerRight,
                           child: Text(
                             meta,
-                            style: TextStyle(fontSize: 11, color: strong.withOpacity(0.7)),
+                            style: TextStyle(
+                                fontSize: 11, color: strong.withOpacity(0.7)),
                           ),
                         ),
                       ],

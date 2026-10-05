@@ -25,9 +25,8 @@ class SubjectSummary {
     for (final subject in subjects) {
       final topics = await topicRepo.getForSubject(subject.id);
       final completed = topics.where((t) => t.completed).length;
-      final percent = topics.isEmpty
-          ? 0
-          : ((completed / topics.length) * 100).round();
+      final percent =
+          topics.isEmpty ? 0 : ((completed / topics.length) * 100).round();
       summaries.add(SubjectSummary(
         subject: subject,
         topicCount: topics.length,

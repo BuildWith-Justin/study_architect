@@ -20,7 +20,8 @@ class TimetableWeekData {
   });
 
   List<StudySession> forDay(DateTime day) {
-    final list = sessions.where((s) => isSameDay(s.scheduledDate, day)).toList();
+    final list =
+        sessions.where((s) => isSameDay(s.scheduledDate, day)).toList();
     list.sort((a, b) => a.startTime.compareTo(b.startTime));
     return list;
   }

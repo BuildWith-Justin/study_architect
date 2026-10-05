@@ -86,7 +86,8 @@ class AuthHeader extends StatelessWidget {
             color: AuthColors.primary,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Icon(Icons.auto_stories_rounded, color: Colors.white, size: 32),
+          child: const Icon(Icons.auto_stories_rounded,
+              color: Colors.white, size: 32),
         ),
         const SizedBox(height: 18),
         Text(
@@ -211,15 +212,19 @@ class AuthPrimaryButton extends StatelessWidget {
           foregroundColor: Colors.white,
           disabledBackgroundColor: AuthColors.primary.withOpacity(0.6),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         child: loading
             ? const SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.4, color: Colors.white),
               )
-            : Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            : Text(label,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       ),
     );
   }
@@ -228,7 +233,8 @@ class AuthPrimaryButton extends StatelessWidget {
 class AuthGoogleButton extends StatelessWidget {
   final bool loading;
   final VoidCallback? onPressed;
-  const AuthGoogleButton({super.key, required this.loading, required this.onPressed});
+  const AuthGoogleButton(
+      {super.key, required this.loading, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +246,8 @@ class AuthGoogleButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: AuthColors.text,
           side: const BorderSide(color: Color(0xFFD4E4DF)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         icon: const Text(
           'G',
@@ -328,7 +335,8 @@ class AuthInfoBox extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.mark_email_read_outlined, color: Color(0xFF2E8B57), size: 20),
+          const Icon(Icons.mark_email_read_outlined,
+              color: Color(0xFF2E8B57), size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

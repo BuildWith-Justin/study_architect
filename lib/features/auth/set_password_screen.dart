@@ -89,7 +89,8 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
               alignment: Alignment.centerLeft,
               child: IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back_rounded, color: AuthColors.text),
+                icon: const Icon(Icons.arrow_back_rounded,
+                    color: AuthColors.text),
               ),
             ),
           AuthCard(
@@ -99,7 +100,9 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   AuthHeader(
-                    title: recovery ? 'Choose a new password' : 'Set your password',
+                    title: recovery
+                        ? 'Choose a new password'
+                        : 'Set your password',
                     subtitle: recovery
                         ? 'Enter a new password for your account'
                         : 'Use it to sign in with your email, alongside any other method',
@@ -133,8 +136,9 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                     obscure: _obscure,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _submit(),
-                    validator: (v) =>
-                        v != _passwordCtrl.text ? 'Passwords do not match' : null,
+                    validator: (v) => v != _passwordCtrl.text
+                        ? 'Passwords do not match'
+                        : null,
                   ),
                   const SizedBox(height: 20),
                   AuthPrimaryButton(

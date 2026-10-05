@@ -50,9 +50,8 @@ class DailyGoalDial extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final secondary =
         isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
-    final track = isDark
-        ? Colors.white.withValues(alpha: 0.10)
-        : AppColors.primarySoft;
+    final track =
+        isDark ? Colors.white.withValues(alpha: 0.10) : AppColors.primarySoft;
     final frac = (minutes - minMinutes) / (maxMinutes - minMinutes);
 
     return GestureDetector(

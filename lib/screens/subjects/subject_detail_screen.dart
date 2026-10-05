@@ -332,8 +332,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     BuildContext context,
     Subject subject,
   ) async {
-    final relatedCount =
-        await _subjectRepo.countRelatedRecords(subject.id);
+    final relatedCount = await _subjectRepo.countRelatedRecords(subject.id);
 
     if (!context.mounted) return;
 
@@ -576,8 +575,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
               final accent = Color(subject.colorValue);
               final topics = _ordered(data.topics);
 
-              final completedTopics =
-                  topics.where((t) => t.completed).length;
+              final completedTopics = topics.where((t) => t.completed).length;
 
               final percent = topics.isEmpty
                   ? 0
@@ -634,8 +632,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
                         tooltip: 'Delete subject',
-                        onPressed: () =>
-                            _confirmDelete(context, subject),
+                        onPressed: () => _confirmDelete(context, subject),
                       ),
                     ],
                   ),

@@ -43,7 +43,9 @@ class TopicRow extends StatelessWidget {
                 decoration: completed ? TextDecoration.lineThrough : null,
                 color: completed
                     ? AppColors.textSecondary
-                    : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+                    : (isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary),
               ),
             ),
           ),

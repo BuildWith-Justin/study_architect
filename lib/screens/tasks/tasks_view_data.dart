@@ -42,14 +42,14 @@ class TasksViewData {
     final overdueList = pending
         .where((t) => !t.completed && t.dueDate.isBefore(today))
         .toList();
-    final todayList = pending
-        .where((t) => isSameDay(t.dueDate, today))
-        .toList();
-    final tomorrowList = pending
-        .where((t) => isSameDay(t.dueDate, tomorrow))
-        .toList();
+    final todayList =
+        pending.where((t) => isSameDay(t.dueDate, today)).toList();
+    final tomorrowList =
+        pending.where((t) => isSameDay(t.dueDate, tomorrow)).toList();
     final upcomingList = pending
-        .where((t) => t.dueDate.isAfter(dayAfterTomorrow) || isSameDay(t.dueDate, dayAfterTomorrow))
+        .where((t) =>
+            t.dueDate.isAfter(dayAfterTomorrow) ||
+            isSameDay(t.dueDate, dayAfterTomorrow))
         .toList();
 
     for (final list in [overdueList, todayList, tomorrowList, upcomingList]) {

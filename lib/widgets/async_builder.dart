@@ -35,7 +35,8 @@ class AsyncBuilder<T> extends StatelessWidget {
         late final String stateKey;
 
         if (snapshot.hasError) {
-          child = _ErrorView(message: errorMessage, onRetry: onRetry, error: snapshot.error);
+          child = _ErrorView(
+              message: errorMessage, onRetry: onRetry, error: snapshot.error);
           stateKey = 'error';
         } else if (!snapshot.hasData) {
           child = const Center(child: CircularProgressIndicator());
@@ -77,7 +78,8 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, size: 32, color: context.secondaryText),
+            Icon(Icons.error_outline_rounded,
+                size: 32, color: context.secondaryText),
             const SizedBox(height: AppSpacing.sm),
             Text(
               message,

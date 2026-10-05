@@ -19,7 +19,8 @@ class AuthService {
   /// Deep link used to come back into the app after Google sign-in, after
   /// tapping the confirmation link in a sign-up email, or after tapping a
   /// password-reset link (Android/iOS/Windows).
-  static const String mobileRedirect = 'io.supabase.studyarchitect://login-callback/';
+  static const String mobileRedirect =
+      'io.supabase.studyarchitect://login-callback/';
 
   User? get currentUser => _client.auth.currentUser;
   Session? get currentSession => _client.auth.currentSession;
@@ -154,7 +155,8 @@ class AuthService {
       if (m.contains('email not confirmed')) {
         return 'Please confirm your email first. Check your inbox.';
       }
-      if (m.contains('already registered') || m.contains('already been registered')) {
+      if (m.contains('already registered') ||
+          m.contains('already been registered')) {
         return 'An account with this email already exists. Try signing in, or tap "Continue with Google" if you signed up with Google.';
       }
       if (m.contains('different from the old password') ||
@@ -170,13 +172,16 @@ class AuthService {
       if (m.contains('password should be at least')) {
         return 'Password is too short. Use at least 6 characters.';
       }
-      if (m.contains('unable to validate email') || m.contains('invalid email')) {
+      if (m.contains('unable to validate email') ||
+          m.contains('invalid email')) {
         return 'That email address does not look valid.';
       }
-      if (m.contains('signups not allowed') || m.contains('signup is disabled')) {
+      if (m.contains('signups not allowed') ||
+          m.contains('signup is disabled')) {
         return 'Sign-ups are currently turned off.';
       }
-      if (m.contains('provider is not enabled') || m.contains('unsupported provider')) {
+      if (m.contains('provider is not enabled') ||
+          m.contains('unsupported provider')) {
         return 'This sign-in method is not enabled yet.';
       }
       if (m.contains('rate limit') || m.contains('too many requests')) {

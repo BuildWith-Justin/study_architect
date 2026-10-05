@@ -26,8 +26,7 @@ class MoreScreen extends StatefulWidget {
   State<MoreScreen> createState() => _MoreScreenState();
 }
 
-class _MoreScreenState extends State<MoreScreen>
-    with WidgetsBindingObserver {
+class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
   late Future<MoreViewData> _future;
 
   final _settingsRepo = SettingsRepository();
@@ -213,8 +212,6 @@ class _MoreScreenState extends State<MoreScreen>
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: AppSpacing.lg),
-
-              
 
               const PasswordPromptCard(),
 

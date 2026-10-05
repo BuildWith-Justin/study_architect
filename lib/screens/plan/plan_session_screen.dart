@@ -22,7 +22,8 @@ class PlanSessionScreen extends StatelessWidget {
               const Expanded(
                 child: ScreenPlaceholder(
                   title: 'Plan your next study block',
-                  note: 'Full form lands once Subjects and local storage exist.',
+                  note:
+                      'Full form lands once Subjects and local storage exist.',
                 ),
               ),
             ],

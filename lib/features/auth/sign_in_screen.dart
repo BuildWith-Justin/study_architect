@@ -141,7 +141,9 @@ class _SignInScreenState extends State<SignInScreen> {
                     (v == null || v.isEmpty) ? 'Enter your password' : null,
                 suffix: IconButton(
                   icon: Icon(
-                    _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    _obscure
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     color: AuthColors.muted,
                   ),
                   onPressed: () => setState(() => _obscure = !_obscure),
@@ -177,7 +179,8 @@ class _SignInScreenState extends State<SignInScreen> {
                     onPressed: _loading
                         ? null
                         : () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const SignUpScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const SignUpScreen()),
                             ),
                     child: const Text(
                       'Sign Up',

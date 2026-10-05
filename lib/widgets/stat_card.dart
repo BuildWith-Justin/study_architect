@@ -8,6 +8,7 @@ class StatCard extends StatelessWidget {
   final String value;
   final IconData? icon;
   final Color? accent;
+
   /// Set true only for a card that's actually tappable (e.g. Weekly
   /// goal opening Progress) — adds a small chevron so the card looks
   /// interactive instead of being visually identical to the other,
@@ -76,7 +77,8 @@ class StatCard extends StatelessWidget {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 16, color: accent ?? AppColors.accentPurpleStrong),
+                Icon(icon,
+                    size: 16, color: accent ?? AppColors.accentPurpleStrong),
                 const SizedBox(width: 4),
               ],
               Text(

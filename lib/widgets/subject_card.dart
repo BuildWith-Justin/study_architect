@@ -33,7 +33,8 @@ class SubjectCard extends StatelessWidget {
             backgroundColor: strong,
             child: Text(
               name.isNotEmpty ? name[0].toUpperCase() : '?',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -52,7 +53,8 @@ class SubjectCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '$topicCount topics',
-                  style: TextStyle(fontSize: 12, color: strong.withOpacity(0.85)),
+                  style:
+                      TextStyle(fontSize: 12, color: strong.withOpacity(0.85)),
                 ),
               ],
             ),

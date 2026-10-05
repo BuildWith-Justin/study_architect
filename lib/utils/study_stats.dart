@@ -30,8 +30,7 @@ int currentStreak(Set<String> completedDates, {DateTime? today}) {
   var cursor = startOfDay(now);
   var streak = 0;
 
-  bool hasSessionOn(DateTime day) =>
-      completedDates.contains(_dateKey(day));
+  bool hasSessionOn(DateTime day) => completedDates.contains(_dateKey(day));
 
   // If today already has a completed session, count it and step back
   // from yesterday. If not, today is skipped (not yet failed) and we
@@ -63,7 +62,8 @@ int longestStreak(Set<String> completedDates) {
 
   final sortedDates = completedDates.map((key) {
     final parts = key.split('-');
-    return DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+    return DateTime(
+        int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
   }).toList()
     ..sort();
 

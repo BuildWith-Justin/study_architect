@@ -63,7 +63,6 @@ class _SubjectSetupScreenState extends State<SubjectSetupScreen> {
                 ),
           ),
           const SizedBox(height: AppSpacing.xl),
-
           Text(
             'Subject Name',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -93,9 +92,7 @@ class _SubjectSetupScreenState extends State<SubjectSetupScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: AppSpacing.lg),
-
           Text(
             'Difficulty',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -125,9 +122,7 @@ class _SubjectSetupScreenState extends State<SubjectSetupScreen> {
               });
             },
           ),
-
           const SizedBox(height: AppSpacing.lg),
-
           Text(
             'Weekly Target: ${_weeklyTargetHours.round()} hours',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -146,9 +141,7 @@ class _SubjectSetupScreenState extends State<SubjectSetupScreen> {
               });
             },
           ),
-
           const SizedBox(height: AppSpacing.sm),
-
           Text(
             'Color',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -158,8 +151,7 @@ class _SubjectSetupScreenState extends State<SubjectSetupScreen> {
           const SizedBox(height: 8),
           Row(
             children: _colorOptions.map((color) {
-              final selected =
-                  color.toARGB32() == _color.toARGB32();
+              final selected = color.toARGB32() == _color.toARGB32();
 
               return Padding(
                 padding: const EdgeInsets.only(
@@ -186,9 +178,7 @@ class _SubjectSetupScreenState extends State<SubjectSetupScreen> {
               );
             }).toList(),
           ),
-
           const SizedBox(height: AppSpacing.xl * 2),
-
           PrimaryButton(
             label: 'Save Subject',
             onPressed: _canSave

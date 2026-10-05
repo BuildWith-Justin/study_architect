@@ -122,7 +122,8 @@ class StudySession {
         rating: map['rating'] as int?,
         complete: (map['complete'] as int) == 1,
         // Older rows and older backups have no recurrence columns.
-        recurrence: recurrenceFromString(map['recurrence'] as String? ?? 'none'),
+        recurrence:
+            recurrenceFromString(map['recurrence'] as String? ?? 'none'),
         recurrenceUntil: map['recurrenceUntil'] == null
             ? null
             : DateTime.parse(map['recurrenceUntil'] as String),

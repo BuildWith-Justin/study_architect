@@ -6,6 +6,7 @@ import '../../widgets/app_buttons.dart';
 import '../../widgets/subject_list_tile.dart';
 import 'add_edit_subject_screen.dart';
 import 'subject_detail_screen.dart';
+import '../exams/exams_view.dart';
 import 'subjects_view_data.dart';
 
 class SubjectsScreen extends StatefulWidget {
@@ -18,6 +19,7 @@ class SubjectsScreen extends StatefulWidget {
 class _SubjectsScreenState extends State<SubjectsScreen>
     with WidgetsBindingObserver, RefreshableScreenMixin {
   late Future<List<SubjectSummary>> _future;
+  bool _showExams = false;
 
   @override
   void initState() {
@@ -89,6 +91,48 @@ class _SubjectsScreenState extends State<SubjectsScreen>
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            0,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<bool>(
+              showSelectedIcon: false,
+              style: SegmentedButton.styleFrom(
+                foregroundColor: context.primaryText,
+                selectedForegroundColor: AppColors.primaryDark,
+                selectedBackgroundColor: AppColors.primarySoft,
+                side: BorderSide(
+                  color: context.secondaryText.withValues(alpha: 0.3),
+                ),
+              ),
+              segments: const [
+                ButtonSegment(value: false, label: Text('Subjects')),
+                ButtonSegment(value: true, label: Text('Exams')),
+              ],
+              selected: {_showExams},
+              onSelectionChanged: (value) {
+                setState(() {
+                  _showExams = value.first;
+                });
+              },
+            ),
+          ),
+        ),
+        Expanded(
+          child: _showExams ? const ExamsView() : _buildSubjects(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubjects(BuildContext context) {
     return FutureBuilder<List<SubjectSummary>>(
       future: _future,
       builder: (context, snapshot) {

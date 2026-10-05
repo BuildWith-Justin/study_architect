@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -9,8 +8,7 @@ import '../repositories/settings_repository.dart';
 class NotificationService {
   NotificationService._internal();
 
-  static final NotificationService instance =
-      NotificationService._internal();
+  static final NotificationService instance = NotificationService._internal();
 
   final _plugin = FlutterLocalNotificationsPlugin();
   final _settingsRepo = SettingsRepository();
@@ -34,8 +32,7 @@ class NotificationService {
       // Falls back to UTC if the device timezone cannot be determined.
     }
 
-    const androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const iosInit = DarwinInitializationSettings();
 
@@ -110,8 +107,7 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidScheduleMode:
-          AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
   }
 
@@ -159,14 +155,12 @@ class NotificationService {
         android: AndroidNotificationDetails(
           'daily_goal_reminders',
           'Daily goal reminders',
-          channelDescription:
-              'A daily nudge to hit your study goal.',
+          channelDescription: 'A daily nudge to hit your study goal.',
           importance: Importance.defaultImportance,
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidScheduleMode:
-          AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }

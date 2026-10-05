@@ -89,7 +89,8 @@ class SessionRepository {
 
   Future<StudySession?> getById(String id) async {
     final db = await _db.database;
-    final rows = await db.query('study_sessions', where: 'id = ?', whereArgs: [id]);
+    final rows =
+        await db.query('study_sessions', where: 'id = ?', whereArgs: [id]);
     if (rows.isEmpty) return null;
     return StudySession.fromMap(rows.first);
   }

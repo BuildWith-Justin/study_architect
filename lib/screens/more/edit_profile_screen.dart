@@ -63,7 +63,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              AppBar(title: const Text('Edit profile'), leading: const BackButton()),
+              AppBar(
+                  title: const Text('Edit profile'),
+                  leading: const BackButton()),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(AppSpacing.lg),
@@ -99,7 +101,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        Text(label,
+            style:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         const SizedBox(height: 6),
         TextField(
           controller: controller,

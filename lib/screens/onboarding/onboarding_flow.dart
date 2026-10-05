@@ -202,8 +202,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                               children: [
                                 for (var i = 0; i < _pageCount; i++)
                                   AnimatedContainer(
-                                    duration:
-                                        const Duration(milliseconds: 250),
+                                    duration: const Duration(milliseconds: 250),
                                     margin: const EdgeInsets.symmetric(
                                       horizontal: 4,
                                     ),

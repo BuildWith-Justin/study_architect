@@ -193,7 +193,8 @@ class _SubjectsSetupScreenState extends State<SubjectsSetupScreen> {
             label: 'Continue',
             onPressed: _drafts.isEmpty
                 ? null
-                : () => widget.onFinish(List<SubjectDraft>.unmodifiable(_drafts)),
+                : () =>
+                    widget.onFinish(List<SubjectDraft>.unmodifiable(_drafts)),
           ),
         ],
       ),
@@ -254,13 +255,15 @@ class _AddSubjectSheetState extends State<_AddSubjectSheet> {
   Widget build(BuildContext context) {
     final secondary = AppColors.secondaryText(context);
     final primaryText = AppColors.primaryText(context);
-    final chipOff =
-        AppColors.isDark(context) ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final chipOff = AppColors.isDark(context)
+        ? AppColors.surfaceDark
+        : AppColors.surfaceLight;
     final labelStyle =
         Theme.of(context).textTheme.bodySmall?.copyWith(color: secondary);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.card(context),

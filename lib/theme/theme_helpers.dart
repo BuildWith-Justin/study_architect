@@ -18,13 +18,17 @@ extension ThemeAwareColors on BuildContext {
   /// Plain info/stat card background — e.g. a settings row, a summary
   /// box. Not for pastel accent cards, which stay the same hue in
   /// both themes by design.
-  Color get cardSurface => isDarkMode ? AppColors.surfaceDark : AppColors.surfaceLight;
+  Color get cardSurface =>
+      isDarkMode ? AppColors.surfaceDark : AppColors.surfaceLight;
 
-  Color get cardSurfaceAlt => isDarkMode ? AppColors.surfaceDarkAlt : AppColors.surfaceLightAlt;
+  Color get cardSurfaceAlt =>
+      isDarkMode ? AppColors.surfaceDarkAlt : AppColors.surfaceLightAlt;
 
   /// Body text sitting on a [cardSurface] (not on a pastel card, and
   /// not typed text inside a form field).
-  Color get primaryText => isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary;
+  Color get primaryText =>
+      isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary;
 
-  Color get secondaryText => isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary;
+  Color get secondaryText =>
+      isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary;
 }

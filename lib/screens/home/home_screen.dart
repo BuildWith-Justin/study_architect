@@ -18,6 +18,7 @@ import '../tasks/add_edit_task_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../timetable/timetable_screen.dart';
 import 'home_view_data.dart';
+import 'next_exam_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -97,7 +98,9 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
-    setState(() => _future = next);
+    setState(() {
+      _future = next;
+    });
 
     try {
       await next;
@@ -232,6 +235,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),
+                NextExamCard(loadToken: identityHashCode(data)),
                 const _AiSuggestionCard(),
                 const SizedBox(height: AppSpacing.lg),
                 if (_currentOrNextSession(data) != null) ...[

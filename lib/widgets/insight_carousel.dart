@@ -52,14 +52,16 @@ class _InsightCarouselState extends State<InsightCarousel> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(insight.icon, size: 20, color: AppColors.accentPurpleStrong),
+                      Icon(insight.icon,
+                          size: 20, color: AppColors.accentPurpleStrong),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Text(
                           insight.text,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: context.primaryText,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: context.primaryText,
+                                  ),
                         ),
                       ),
                     ],

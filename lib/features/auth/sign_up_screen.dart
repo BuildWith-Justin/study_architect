@@ -91,7 +91,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             alignment: Alignment.centerLeft,
             child: IconButton(
               onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_rounded, color: AuthColors.text),
+              icon:
+                  const Icon(Icons.arrow_back_rounded, color: AuthColors.text),
             ),
           ),
           AuthCard(
@@ -154,8 +155,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     obscure: _obscure,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _signUp(),
-                    validator: (v) =>
-                        v != _passwordCtrl.text ? 'Passwords do not match' : null,
+                    validator: (v) => v != _passwordCtrl.text
+                        ? 'Passwords do not match'
+                        : null,
                   ),
                   const SizedBox(height: 20),
                   AuthPrimaryButton(

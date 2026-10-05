@@ -13,7 +13,8 @@ class MoreViewData {
     final student = await StudentRepository().getCurrent();
     final settings = await SettingsRepository().get();
     if (student == null) {
-      throw StateError('MoreViewData.load() called before onboarding completed.');
+      throw StateError(
+          'MoreViewData.load() called before onboarding completed.');
     }
     return MoreViewData(student: student, settings: settings);
   }

@@ -7,8 +7,8 @@ enum SyncStatus {
   const SyncStatus(this.value);
   final int value;
 
-  static SyncStatus fromValue(int v) =>
-      SyncStatus.values.firstWhere((s) => s.value == v, orElse: () => SyncStatus.synced);
+  static SyncStatus fromValue(int v) => SyncStatus.values
+      .firstWhere((s) => s.value == v, orElse: () => SyncStatus.synced);
 }
 
 /// Every syncable local table carries these columns.

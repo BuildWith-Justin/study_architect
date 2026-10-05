@@ -77,8 +77,7 @@ class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
     final value = _topicController.text.trim();
     if (value.isEmpty) return;
 
-    final exists =
-        _topics.any((t) => t.toLowerCase() == value.toLowerCase());
+    final exists = _topics.any((t) => t.toLowerCase() == value.toLowerCase());
 
     setState(() {
       if (!exists) _topics.add(value);
@@ -97,8 +96,8 @@ class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
     // A topic typed but not yet added with "+" still counts.
     final pendingTopic = _topicController.text.trim();
     if (!_isEditing && pendingTopic.isNotEmpty) {
-      final exists = _topics
-          .any((t) => t.toLowerCase() == pendingTopic.toLowerCase());
+      final exists =
+          _topics.any((t) => t.toLowerCase() == pendingTopic.toLowerCase());
       if (!exists) _topics.add(pendingTopic);
       _topicController.clear();
     }
@@ -374,8 +373,7 @@ class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
                               _card(
                                 context,
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     _label(context, 'Subject name'),
                                     const SizedBox(height: 6),
@@ -529,9 +527,8 @@ class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
                       PrimaryButton(
                         label: _isEditing ? 'Save changes' : 'Save subject',
                         loading: _saving,
-                        onPressed: _nameController.text.trim().isEmpty
-                            ? null
-                            : _save,
+                        onPressed:
+                            _nameController.text.trim().isEmpty ? null : _save,
                       ),
                     ],
                   ),

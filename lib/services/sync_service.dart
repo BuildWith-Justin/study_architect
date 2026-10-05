@@ -23,6 +23,8 @@ const _tables = [
   _SyncTable('topics'),
   _SyncTable('study_sessions'),
   _SyncTable('tasks'),
+  _SyncTable('exams'),
+  _SyncTable('exam_topics'),
 ];
 
 /// UTC ISO-8601 with millisecond precision — the same shape SQLite writes,
@@ -138,7 +140,8 @@ class SyncService {
   // -------------------------------------------------------------------- meta
 
   Future<String?> _getMeta(Database db, String key) async {
-    final rows = await db.query('sync_meta', where: 'key = ?', whereArgs: [key]);
+    final rows =
+        await db.query('sync_meta', where: 'key = ?', whereArgs: [key]);
     return rows.isEmpty ? null : rows.first['value'] as String;
   }
 
@@ -164,9 +167,10 @@ class SyncService {
 
       while (true) {
         final base = _client.from(t.name).select();
-        final rows = await (cursor == null ? base : base.gt('updatedAt', cursor))
-            .order('updatedAt', ascending: true)
-            .limit(_pageSize);
+        final rows =
+            await (cursor == null ? base : base.gt('updatedAt', cursor))
+                .order('updatedAt', ascending: true)
+                .limit(_pageSize);
 
         for (final raw in rows) {
           final row = Map<String, dynamic>.from(raw);

@@ -26,7 +26,8 @@ List<StudyInsight> generateInsights({
   if (todayMinutes == 0 && now.hour >= 15) {
     insights.add(const StudyInsight(
       icon: Icons.schedule_rounded,
-      text: "You haven't studied yet today — even 20 minutes keeps your streak alive.",
+      text:
+          "You haven't studied yet today — even 20 minutes keeps your streak alive.",
     ));
   }
 
@@ -54,7 +55,8 @@ List<StudyInsight> generateInsights({
     ..sort((a, b) => a.value.compareTo(b.value));
 
   if (behindSubjects.isNotEmpty) {
-    if (weeklyMinutes == 0 && behindSubjects.length == subjectPerformancePercent.length) {
+    if (weeklyMinutes == 0 &&
+        behindSubjects.length == subjectPerformancePercent.length) {
       // Nothing logged at all yet this period — a single general
       // nudge is more useful than naming every subject.
       insights.add(const StudyInsight(
@@ -77,12 +79,14 @@ List<StudyInsight> generateInsights({
   if (streak >= 7) {
     insights.add(StudyInsight(
       icon: Icons.local_fire_department_rounded,
-      text: "You're on a $streak-day streak — your longest is $longestStreak days.",
+      text:
+          "You're on a $streak-day streak — your longest is $longestStreak days.",
     ));
   } else if (streak == 0 && longestStreak > 0) {
     insights.add(StudyInsight(
       icon: Icons.replay_rounded,
-      text: 'Your streak reset. Your best was $longestStreak days — start a new one today.',
+      text:
+          'Your streak reset. Your best was $longestStreak days — start a new one today.',
     ));
   }
 

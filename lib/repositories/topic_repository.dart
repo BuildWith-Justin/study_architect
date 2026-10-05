@@ -1,4 +1,3 @@
-
 import '../models/topic.dart';
 import '../services/database_service.dart';
 
@@ -20,7 +19,8 @@ class TopicRepository {
 
   Future<void> update(Topic topic) async {
     final db = await _db.database;
-    await db.update('topics', topic.toMap(), where: 'id = ?', whereArgs: [topic.id]);
+    await db.update('topics', topic.toMap(),
+        where: 'id = ?', whereArgs: [topic.id]);
   }
 
   /// Changes only the name, leaving position and completion untouched.

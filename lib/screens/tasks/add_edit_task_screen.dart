@@ -120,10 +120,13 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
         title: const Text('Delete task?'),
         content: const Text('This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            child:
+                const Text('Delete', style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -146,11 +149,14 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                 leading: const BackButton(),
                 actions: [
                   if (_isEditing)
-                    IconButton(icon: const Icon(Icons.delete_outline), onPressed: _delete),
+                    IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: _delete),
                 ],
               ),
               if (_loading)
-                const Expanded(child: Center(child: CircularProgressIndicator()))
+                const Expanded(
+                    child: Center(child: CircularProgressIndicator()))
               else
                 Expanded(
                   child: ListView(
@@ -161,22 +167,28 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                         controller: _titleController,
                         onChanged: (_) => setState(() {}),
                         style: const TextStyle(color: AppColors.textPrimary),
-                        decoration: _fieldDecoration(hint: 'Complete 20 calculus questions'),
+                        decoration: _fieldDecoration(
+                            hint: 'Complete 20 calculus questions'),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       if (_subjects.isEmpty)
                         Text(
                           'Add a subject first (Subjects tab) before creating a task.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: AppColors.textSecondary),
                         )
                       else ...[
                         _FieldLabel('Subject'),
                         DropdownButtonFormField<String>(
                           value: _subjectId,
                           decoration: _fieldDecoration(),
-                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontSize: 15),
                           items: _subjects
-                              .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
+                              .map((s) => DropdownMenuItem(
+                                  value: s.id, child: Text(s.name)))
                               .toList(),
                           onChanged: (value) {
                             if (value == null) return;
@@ -189,12 +201,16 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                         DropdownButtonFormField<String?>(
                           value: _topicId,
                           decoration: _fieldDecoration(),
-                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontSize: 15),
                           items: [
-                            const DropdownMenuItem(value: null, child: Text('None')),
-                            ..._topics.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                            const DropdownMenuItem(
+                                value: null, child: Text('None')),
+                            ..._topics.map((t) => DropdownMenuItem(
+                                value: t.id, child: Text(t.name))),
                           ],
-                          onChanged: (value) => setState(() => _topicId = value),
+                          onChanged: (value) =>
+                              setState(() => _topicId = value),
                         ),
                       ],
                       const SizedBox(height: AppSpacing.lg),
@@ -202,9 +218,11 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                       DropdownButtonFormField<TaskType>(
                         value: _type,
                         decoration: _fieldDecoration(),
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+                        style: const TextStyle(
+                            color: AppColors.textPrimary, fontSize: 15),
                         items: TaskType.values
-                            .map((t) => DropdownMenuItem(value: t, child: Text(_typeLabel(t))))
+                            .map((t) => DropdownMenuItem(
+                                value: t, child: Text(_typeLabel(t))))
                             .toList(),
                         onChanged: (value) => setState(() => _type = value!),
                       ),
@@ -215,14 +233,17 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                         borderRadius: BorderRadius.circular(AppRadii.control),
                         child: Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(AppRadii.control),
+                            borderRadius:
+                                BorderRadius.circular(AppRadii.control),
                           ),
                           child: Text(
                             '${_dueDate.year}-${_dueDate.month.toString().padLeft(2, '0')}-${_dueDate.day.toString().padLeft(2, '0')}',
-                            style: const TextStyle(color: AppColors.textPrimary),
+                            style:
+                                const TextStyle(color: AppColors.textPrimary),
                           ),
                         ),
                       ),
@@ -237,7 +258,9 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                       const SizedBox(height: AppSpacing.xl),
                       PrimaryButton(
                         label: _saving ? 'Saving...' : 'Save Task',
-                        onPressed: (_saving || _titleController.text.trim().isEmpty || _subjectId == null)
+                        onPressed: (_saving ||
+                                _titleController.text.trim().isEmpty ||
+                                _subjectId == null)
                             ? null
                             : _save,
                       ),
@@ -287,7 +310,10 @@ class _FieldLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        style: Theme.of(context)
+            .textTheme
+            .bodySmall
+            ?.copyWith(color: AppColors.textSecondary),
       ),
     );
   }

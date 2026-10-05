@@ -70,7 +70,8 @@ class ProgressViewData {
         final weekBuckets = <int, int>{};
         for (final session in periodSessions.where((s) => s.complete)) {
           final weekIndex = ((session.scheduledDate.day - 1) / 7).floor();
-          weekBuckets[weekIndex] = (weekBuckets[weekIndex] ?? 0) + (session.actualDuration ?? 0);
+          weekBuckets[weekIndex] =
+              (weekBuckets[weekIndex] ?? 0) + (session.actualDuration ?? 0);
         }
         final weekCount = (monthEnd.difference(monthStart).inDays / 7).ceil();
         chartPoints = List.generate(weekCount, (i) {
@@ -83,7 +84,8 @@ class ProgressViewData {
 
       case ProgressPeriod.allTime:
         periodSessions = await sessionRepo.getAll();
-        final completedSessions = periodSessions.where((s) => s.complete).toList();
+        final completedSessions =
+            periodSessions.where((s) => s.complete).toList();
         if (completedSessions.isEmpty) {
           chartPoints = const [];
           targetMinutes = 0;
@@ -91,8 +93,10 @@ class ProgressViewData {
         } else {
           final monthBuckets = <String, int>{};
           for (final session in completedSessions) {
-            final key = '${session.scheduledDate.year}-${session.scheduledDate.month}';
-            monthBuckets[key] = (monthBuckets[key] ?? 0) + (session.actualDuration ?? 0);
+            final key =
+                '${session.scheduledDate.year}-${session.scheduledDate.month}';
+            monthBuckets[key] =
+                (monthBuckets[key] ?? 0) + (session.actualDuration ?? 0);
           }
           final sortedKeys = monthBuckets.keys.toList()
             ..sort((a, b) {
@@ -105,12 +109,23 @@ class ProgressViewData {
               ? sortedKeys.sublist(sortedKeys.length - 6)
               : sortedKeys;
           const monthNames = [
-            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
           ];
           chartPoints = shown.map((key) {
             final month = int.parse(key.split('-')[1]);
-            return BarChartPoint(label: monthNames[month - 1], value: monthBuckets[key]!);
+            return BarChartPoint(
+                label: monthNames[month - 1], value: monthBuckets[key]!);
           }).toList();
 
           final firstDate = completedSessions
@@ -143,15 +158,18 @@ class ProgressViewData {
     final longest = study_stats.longestStreak(completedDates);
 
     final insights = generateInsights(
-      todayMinutes: completedMinutesForDate(await sessionRepo.getForDate(now), now),
+      todayMinutes:
+          completedMinutesForDate(await sessionRepo.getForDate(now), now),
       weeklyMinutes: period == ProgressPeriod.week
           ? totalMinutes
-          : completedMinutesTotal(await sessionRepo.getForRange(startOfWeek(now), endOfWeek(now))),
+          : completedMinutesTotal(
+              await sessionRepo.getForRange(startOfWeek(now), endOfWeek(now))),
       weeklyGoalMinutes: student?.weeklyGoalMinutes ?? 0,
       streak: streak,
       longestStreak: longest,
       subjectPerformancePercent: {
-        for (final entry in subjectPerformance.entries) entry.key.name: entry.value,
+        for (final entry in subjectPerformance.entries)
+          entry.key.name: entry.value,
       },
     );
 

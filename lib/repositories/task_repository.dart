@@ -11,7 +11,8 @@ class TaskRepository {
 
   Future<void> update(Task task) async {
     final db = await _db.database;
-    await db.update('tasks', task.toMap(), where: 'id = ?', whereArgs: [task.id]);
+    await db
+        .update('tasks', task.toMap(), where: 'id = ?', whereArgs: [task.id]);
   }
 
   Future<void> delete(String id) async {

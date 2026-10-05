@@ -99,7 +99,9 @@ class _AuthDiagnosticsScreenState extends State<AuthDiagnosticsScreen> {
     results.add(_Check(
       'Session present',
       session != null && user != null,
-      session != null ? 'A session is stored on this device' : 'No one is signed in',
+      session != null
+          ? 'A session is stored on this device'
+          : 'No one is signed in',
     ));
     if (session == null || user == null) {
       finish();

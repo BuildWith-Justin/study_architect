@@ -54,7 +54,9 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              AppBar(title: const Text('Study goals'), leading: const BackButton()),
+              AppBar(
+                  title: const Text('Study goals'),
+                  leading: const BackButton()),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(AppSpacing.lg),
@@ -63,7 +65,8 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                     children: [
                       Text(
                         'Daily goal: ${_dailyHours.round()} hours',
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 13),
                       ),
                       Slider(
                         value: _dailyHours.clamp(1, 12),
@@ -76,7 +79,8 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                       const SizedBox(height: AppSpacing.lg),
                       Text(
                         'Weekly goal: ${_weeklyHours.round()} hours',
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 13),
                       ),
                       Slider(
                         value: _weeklyHours.clamp(1, 60),

@@ -54,7 +54,8 @@ class _PasswordPromptCardState extends State<PasswordPromptCard> {
   @override
   Widget build(BuildContext context) {
     if (!AuthService.isAvailable) return const SizedBox.shrink();
-    if (AuthService.instance.currentUser == null) return const SizedBox.shrink();
+    if (AuthService.instance.currentUser == null)
+      return const SizedBox.shrink();
     if (AuthService.instance.hasPassword) return const SizedBox.shrink();
     if (AuthService.passwordPromptDismissed) return const SizedBox.shrink();
 
