@@ -1,0 +1,2665 @@
+
+=== LIB TREE ===
+lib\main.dart
+lib\.github\workflows\supabase-keepalive.yml
+lib\app\app.dart
+lib\app\route_observer.dart
+lib\app\routes.dart
+lib\app\startup_decider.dart
+lib\app\theme_controller.dart
+lib\core\data_refresh_bus.dart
+lib\core\refreshable_screen.dart
+lib\core\sync\syncable.dart
+lib\features\auth\auth_diagnostics_screen.dart
+lib\features\auth\auth_gate.dart
+lib\features\auth\auth_service.dart
+lib\features\auth\auth_widgets.dart
+lib\features\auth\password_prompt_card.dart
+lib\features\auth\password_prompt_gate.dart
+lib\features\auth\set_password_screen.dart
+lib\features\auth\sign_in_screen.dart
+lib\features\auth\sign_up_screen.dart
+lib\models\exam_topic.dart
+lib\models\exam.dart
+lib\models\settings.dart
+lib\models\student.dart
+lib\models\study_session.dart
+lib\models\subject.dart
+lib\models\task.dart
+lib\models\topic.dart
+lib\repositories\exam_repository.dart
+lib\repositories\session_repository.dart
+lib\repositories\settings_repository.dart
+lib\repositories\student_repository.dart
+lib\repositories\subject_repository.dart
+lib\repositories\task_repository.dart
+lib\repositories\topic_repository.dart
+lib\screens\exams\add_edit_exam_screen.dart
+lib\screens\exams\exam_detail_screen.dart
+lib\screens\exams\exams_screen.dart
+lib\screens\exams\exams_view_data.dart
+lib\screens\exams\exams_view.dart
+lib\screens\home\home_screen.dart
+lib\screens\home\home_view_data.dart
+lib\screens\home\next_exam_card.dart
+lib\screens\more\backup_screen.dart
+lib\screens\more\edit_goals_screen.dart
+lib\screens\more\edit_profile_screen.dart
+lib\screens\more\more_screen.dart
+lib\screens\more\more_view_data.dart
+lib\screens\onboarding\goal_dial_screen.dart
+lib\screens\onboarding\goal_setup_screen.dart
+lib\screens\onboarding\onboarding_flow.dart
+lib\screens\onboarding\profile_setup_screen.dart
+lib\screens\onboarding\subject_setup_screen.dart
+lib\screens\onboarding\subjects_setup_screen.dart
+lib\screens\onboarding\welcome_screen.dart
+lib\screens\plan\plan_session_screen.dart
+lib\screens\progress\progress_screen.dart
+lib\screens\progress\progress_view_data.dart
+lib\screens\progress\weekly_report_screen.dart
+lib\screens\progress\weekly_report_view_data.dart
+lib\screens\session\create_session_screen.dart
+lib\screens\session\focus_timer_screen.dart
+lib\screens\session\session_complete_screen.dart
+lib\screens\subjects\add_edit_subject_screen.dart
+lib\screens\subjects\subject_detail_screen.dart
+lib\screens\subjects\subjects_screen.dart
+lib\screens\subjects\subjects_view_data.dart
+lib\screens\tasks\add_edit_task_screen.dart
+lib\screens\tasks\tasks_screen.dart
+lib\screens\tasks\tasks_view_data.dart
+lib\screens\timetable\add_edit_session_screen.dart
+lib\screens\timetable\plan_session_screen.dart
+lib\screens\timetable\timetable_screen.dart
+lib\screens\timetable\timetable_view_data.dart
+lib\services\backup_service.dart
+lib\services\database_service.dart
+lib\services\notification_service.dart
+lib\services\sync_schema.dart
+lib\services\sync_service.dart
+lib\theme\app_theme.dart
+lib\theme\dark_theme.dart
+lib\theme\light_theme.dart
+lib\theme\theme_helpers.dart
+lib\utils\date_utils.dart
+lib\utils\exam_format.dart
+lib\utils\session_recurrence.dart
+lib\utils\study_insights.dart
+lib\utils\study_stats.dart
+lib\widgets\app_buttons.dart
+lib\widgets\app_logo.dart
+lib\widgets\async_builder.dart
+lib\widgets\class_card.dart
+lib\widgets\daily_goal_dial.dart
+lib\widgets\exam_list_tile.dart
+lib\widgets\focus_ring.dart
+lib\widgets\gradient_background.dart
+lib\widgets\insight_carousel.dart
+lib\widgets\main_scaffold.dart
+lib\widgets\pastel_card.dart
+lib\widgets\progress_card.dart
+lib\widgets\roadmap_topic_tile.dart
+lib\widgets\schedule_row.dart
+lib\widgets\screen_placeholder.dart
+lib\widgets\simple_bar_chart.dart
+lib\widgets\splash_view.dart
+lib\widgets\stat_card.dart
+lib\widgets\study_bar_chart.dart
+lib\widgets\subject_card.dart
+lib\widgets\subject_list_tile.dart
+lib\widgets\task_card.dart
+lib\widgets\timeline_event_card.dart
+lib\widgets\topic_row.dart
+
+=== FILE: pubspec.yaml ===
+name: study_architect
+description: "Study Architect — local-first Flutter study planner and tracker."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.2.1
+  sqflite: ^2.3.3
+  sqflite_common_ffi: ^2.4.3
+  path: ^1.9.0
+  uuid: ^4.6.0
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
+  file_picker: ^13.1.0
+  share_plus: ^13.3.0
+  path_provider: ^2.1.4
+  supabase_flutter: ^2.8.0
+  flutter_dotenv: ^5.2.1
+  url_launcher: ^6.3.2
+  fl_chart: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
+
+=== FILE: lib\main.dart ===
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app/app.dart';
+import 'features/auth/auth_service.dart';
+import 'services/notification_service.dart';
+import 'services/sync_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Plain sqflite only ships a native database engine for Android/iOS.
+  // On Windows and Linux desktop there is no such engine bundled, so
+  // sqflite_common_ffi's databaseFactory must be installed explicitly
+  // before DatabaseService (or anything else) opens a database —
+  // otherwise every DB call throws "databaseFactory not initialized."
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  // V2: load Supabase credentials from .env and start the client.
+  // Wrapped in try/catch so a missing .env or a Supabase problem never
+  // stops the local-first app from launching.
+  try {
+    await dotenv.load(fileName: '.env');
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL']!,
+      publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    );
+    // Only flips to true when init fully succeeded. AuthGate reads this
+    // so it never touches Supabase.instance when the client isn't ready.
+    AuthService.isAvailable = true;
+    debugPrint('Supabase initialized OK');
+
+    // V2 Step 4: start local <-> cloud sync (does nothing until signed in).
+    SyncService.instance.start();
+  } catch (e) {
+    AuthService.isAvailable = false;
+    debugPrint('Supabase init failed: $e');
+  }
+
+  // Safe no-op on Web — see notification_service.dart for why.
+  await NotificationService.instance.init();
+  runApp(const StudyArchitectApp());
+}
+
+
+=== FILE: lib\core\refreshable_screen.dart ===
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'data_refresh_bus.dart';
+
+/// Mixin any StatefulWidget's State with this to get:
+/// - auto-refresh when relevant data changes elsewhere in the app
+/// - pull-to-refresh wired to the same reload function
+mixin RefreshableScreenMixin<T extends StatefulWidget> on State<T> {
+  StreamSubscription<RefreshScope>? _refreshSub;
+
+  /// Override: which scopes should trigger a refresh on this screen
+  List<RefreshScope> get watchedScopes => [RefreshScope.all];
+
+  /// Override: how this screen reloads its data
+  Future<void> onRefresh();
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshSub = DataRefreshBus.instance.stream.listen((scope) {
+      if (watchedScopes.contains(scope) || scope == RefreshScope.all) {
+        onRefresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshSub?.cancel();
+    super.dispose();
+  }
+
+  Widget buildRefreshable({required Widget child}) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: child,
+    );
+  }
+}
+
+
+=== FILE: lib\core\data_refresh_bus.dart ===
+import 'dart:async';
+
+enum RefreshScope {
+  subjects,
+  sessions,
+  tasks,
+  exams,
+  achievements,
+  all,
+}
+
+class DataRefreshBus {
+  DataRefreshBus._internal();
+  static final DataRefreshBus instance = DataRefreshBus._internal();
+
+  final StreamController<RefreshScope> _controller =
+      StreamController<RefreshScope>.broadcast();
+
+  Stream<RefreshScope> get stream => _controller.stream;
+
+  void notify(RefreshScope scope) {
+    _controller.add(scope);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+
+=== FILE: lib\repositories\session_repository.dart ===
+import '../models/study_session.dart';
+import '../services/database_service.dart';
+
+class SessionRepository {
+  final _db = DatabaseService.instance;
+
+  /// Throws if the session's end time is not after its start time -
+  /// enforces the V1 business rule at the persistence boundary.
+  Future<void> create(StudySession session) async {
+    if (!session.isTimeRangeValid) {
+      throw ArgumentError('Session end time must be after start time.');
+    }
+    final db = await _db.database;
+    await db.insert('study_sessions', session.toMap());
+  }
+
+  /// V2 Step 7: saves a whole weekly series in one transaction, so a
+  /// failure can never leave half a series behind.
+  Future<void> createMany(List<StudySession> sessions) async {
+    for (final s in sessions) {
+      if (!s.isTimeRangeValid) {
+        throw ArgumentError('Session end time must be after start time.');
+      }
+    }
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      for (final s in sessions) {
+        await txn.insert('study_sessions', s.toMap());
+      }
+    });
+  }
+
+  Future<void> update(StudySession session) async {
+    if (!session.isTimeRangeValid) {
+      throw ArgumentError('Session end time must be after start time.');
+    }
+    final db = await _db.database;
+    await db.update(
+      'study_sessions',
+      session.toMap(),
+      where: 'id = ?',
+      whereArgs: [session.id],
+    );
+  }
+
+  Future<void> delete(String id) async {
+    final db = await _db.database;
+    await db.delete('study_sessions', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// V2 Step 7: deletes the occurrences of one series. With [fromDate],
+  /// only occurrences on or after that day are removed. Returns the
+  /// deleted sessions so the caller can cancel their reminders.
+  Future<List<StudySession>> deleteSeries(
+    String seriesId, {
+    DateTime? fromDate,
+  }) async {
+    final db = await _db.database;
+    final String where;
+    final List<Object?> args;
+    if (fromDate == null) {
+      where = 'seriesId = ?';
+      args = [seriesId];
+    } else {
+      final day = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      where = 'seriesId = ? AND scheduledDate >= ?';
+      args = [seriesId, day.toIso8601String()];
+    }
+    final rows = await db.query(
+      'study_sessions',
+      where: where,
+      whereArgs: args,
+    );
+    await db.delete('study_sessions', where: where, whereArgs: args);
+    return rows.map(StudySession.fromMap).toList();
+  }
+
+  /// Every occurrence of one series, oldest first.
+  Future<List<StudySession>> getBySeries(String seriesId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'study_sessions',
+      where: 'seriesId = ?',
+      whereArgs: [seriesId],
+      orderBy: 'scheduledDate ASC',
+    );
+    return rows.map(StudySession.fromMap).toList();
+  }
+
+  Future<StudySession?> getById(String id) async {
+    final db = await _db.database;
+    final rows =
+        await db.query('study_sessions', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    return StudySession.fromMap(rows.first);
+  }
+
+  /// Sessions scheduled on one calendar day - powers Home's "today's
+  /// schedule" and the streak calculation.
+  Future<List<StudySession>> getForDate(DateTime date) async {
+    final db = await _db.database;
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final rows = await db.query(
+      'study_sessions',
+      where: 'scheduledDate >= ? AND scheduledDate < ?',
+      whereArgs: [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
+      orderBy: 'startTime ASC',
+    );
+    return rows.map(StudySession.fromMap).toList();
+  }
+
+  /// Sessions within an inclusive date range - powers the Timetable
+  /// week view and the Progress screen.
+  Future<List<StudySession>> getForRange(DateTime start, DateTime end) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'study_sessions',
+      where: 'scheduledDate >= ? AND scheduledDate <= ?',
+      whereArgs: [start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'startTime ASC',
+    );
+    return rows.map(StudySession.fromMap).toList();
+  }
+
+  Future<List<StudySession>> getForSubject(String subjectId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'study_sessions',
+      where: 'subjectId = ?',
+      whereArgs: [subjectId],
+      orderBy: 'scheduledDate DESC',
+    );
+    return rows.map(StudySession.fromMap).toList();
+  }
+
+  /// Distinct calendar dates (as yyyy-MM-dd strings) that have at
+  /// least one completed session - the raw material for the streak
+  /// calculation in utils/study_stats.dart.
+  Future<Set<String>> getCompletedDates() async {
+    final db = await _db.database;
+    final rows = await db.rawQuery('''
+      SELECT DISTINCT substr(scheduledDate, 1, 10) as day
+      FROM study_sessions
+      WHERE complete = 1
+    ''');
+    return rows.map((r) => r['day'] as String).toSet();
+  }
+
+  /// Every session ever recorded - used by the Progress screen's
+  /// "All time" view.
+  Future<List<StudySession>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('study_sessions', orderBy: 'scheduledDate ASC');
+    return rows.map(StudySession.fromMap).toList();
+  }
+}
+
+
+=== FILE: lib\repositories\exam_repository.dart ===
+import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/exam.dart';
+import '../models/exam_topic.dart';
+import '../services/database_service.dart';
+
+/// All reads and writes for exams and their topic checklist.
+/// Like the other repositories, it does not notify DataRefreshBus —
+/// the screens that change data call
+/// DataRefreshBus.instance.notify(RefreshScope.exams) afterwards.
+class ExamRepository {
+  final _db = DatabaseService.instance;
+  static const _uuid = Uuid();
+
+  /// Creates the exam and, in the same transaction, its topic checklist.
+  Future<void> create(Exam exam, {List<String> topicIds = const []}) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      await txn.insert('exams', exam.toMap());
+      for (final topicId in topicIds.toSet()) {
+        await txn.insert(
+          'exam_topics',
+          ExamTopic(id: _uuid.v4(), examId: exam.id, topicId: topicId).toMap(),
+        );
+      }
+    });
+  }
+
+  /// Updates the exam. When [topicIds] is given, the checklist is made to
+  /// match it: removed topics are deleted, new ones are added, and topics
+  /// that stay keep their "prepared" state.
+  Future<void> update(Exam exam, {List<String>? topicIds}) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      await txn.update(
+        'exams',
+        exam.toMap(),
+        where: 'id = ?',
+        whereArgs: [exam.id],
+      );
+      if (topicIds != null) {
+        await _syncTopicLinks(txn, exam.id, topicIds);
+      }
+    });
+  }
+
+  Future<void> _syncTopicLinks(
+    DatabaseExecutor txn,
+    String examId,
+    List<String> topicIds,
+  ) async {
+    final wanted = topicIds.toSet();
+    final rows = await txn.query(
+      'exam_topics',
+      where: 'examId = ?',
+      whereArgs: [examId],
+    );
+    final existing = <String, String>{
+      for (final r in rows) r['topicId'] as String: r['id'] as String,
+    };
+
+    for (final entry in existing.entries) {
+      if (!wanted.contains(entry.key)) {
+        await txn.delete(
+          'exam_topics',
+          where: 'id = ?',
+          whereArgs: [entry.value],
+        );
+      }
+    }
+    for (final topicId in wanted) {
+      if (!existing.containsKey(topicId)) {
+        await txn.insert(
+          'exam_topics',
+          ExamTopic(id: _uuid.v4(), examId: examId, topicId: topicId).toMap(),
+        );
+      }
+    }
+  }
+
+  /// Deletes the exam. Its checklist rows cascade.
+  Future<void> delete(String id) async {
+    final db = await _db.database;
+    await db.delete('exams', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Exam?> getById(String id) async {
+    final db = await _db.database;
+    final rows = await db.query('exams', where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    return Exam.fromMap(rows.first);
+  }
+
+  /// Every exam, nearest date first (past exams come first).
+  Future<List<Exam>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('exams', orderBy: 'examDate ASC');
+    return rows.map(Exam.fromMap).toList();
+  }
+
+  /// Exams from today onwards, nearest first. Pass [limit] to cap the list
+  /// (the Home card asks for the nearest few).
+  Future<List<Exam>> getUpcoming({int? limit, DateTime? now}) async {
+    final db = await _db.database;
+    final today = now ?? DateTime.now();
+    final startOfToday = DateTime(today.year, today.month, today.day);
+    final rows = await db.query(
+      'exams',
+      where: 'examDate >= ?',
+      whereArgs: [startOfToday.toIso8601String()],
+      orderBy: 'examDate ASC',
+      limit: limit,
+    );
+    return rows.map(Exam.fromMap).toList();
+  }
+
+  Future<List<Exam>> getForSubject(String subjectId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'exams',
+      where: 'subjectId = ?',
+      whereArgs: [subjectId],
+      orderBy: 'examDate ASC',
+    );
+    return rows.map(Exam.fromMap).toList();
+  }
+
+  /// The checklist of one exam, in the subject's roadmap order.
+  Future<List<ExamTopic>> getTopicLinks(String examId) async {
+    final db = await _db.database;
+    final rows = await db.rawQuery(
+      'SELECT et.* FROM exam_topics et '
+      'JOIN topics t ON t.id = et.topicId '
+      'WHERE et.examId = ? '
+      'ORDER BY t.sortOrder ASC, t.rowid ASC',
+      [examId],
+    );
+    return rows.map(ExamTopic.fromMap).toList();
+  }
+
+  /// Every checklist row of every exam (used by backups).
+  Future<List<ExamTopic>> getAllTopicLinks() async {
+    final db = await _db.database;
+    final rows = await db.query('exam_topics', orderBy: 'rowid ASC');
+    return rows.map(ExamTopic.fromMap).toList();
+  }
+
+  /// Ticks or unticks one topic of an exam's checklist.
+  Future<void> setTopicPrepared(String examTopicId, bool prepared) async {
+    final db = await _db.database;
+    await db.update(
+      'exam_topics',
+      {'prepared': prepared ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [examTopicId],
+    );
+  }
+
+  Future<ExamProgress> getProgress(String examId) async {
+    final all = await getProgressForAll();
+    return all[examId] ?? const ExamProgress.empty();
+  }
+
+  /// Progress of every exam in one query, keyed by exam id. Exams without
+  /// topics are simply absent from the map.
+  Future<Map<String, ExamProgress>> getProgressForAll() async {
+    final db = await _db.database;
+    final rows = await db.rawQuery(
+      'SELECT examId, COUNT(*) AS total, '
+      'COALESCE(SUM(prepared), 0) AS prepared '
+      'FROM exam_topics GROUP BY examId',
+    );
+    return {
+      for (final r in rows)
+        r['examId'] as String: ExamProgress(
+          prepared: (r['prepared'] as int?) ?? 0,
+          total: (r['total'] as int?) ?? 0,
+        ),
+    };
+  }
+}
+
+
+=== FILE: lib\models\study_session.dart ===
+enum SessionStatus { planned, inProgress, completed, missed }
+
+SessionStatus statusFromString(String value) {
+  return SessionStatus.values.firstWhere(
+    (s) => s.name == value,
+    orElse: () => SessionStatus.planned,
+  );
+}
+
+/// V2 Step 7: how a session repeats. Every occurrence of a repeating
+/// session is stored as its own row; rows of one series share a seriesId.
+enum SessionRecurrence { none, weekly }
+
+SessionRecurrence recurrenceFromString(String value) {
+  return SessionRecurrence.values.firstWhere(
+    (r) => r.name == value,
+    orElse: () => SessionRecurrence.none,
+  );
+}
+
+class StudySession {
+  final String id;
+  final String subjectId;
+  final String? topicId;
+  final DateTime scheduledDate;
+  final DateTime startTime;
+  final DateTime endTime;
+  final int? actualDuration; // minutes, filled in once a session runs
+  final SessionStatus status;
+  final String notes;
+  final int? rating; // 1-5, optional, set at session end
+  final bool complete;
+  final SessionRecurrence recurrence;
+  final DateTime? recurrenceUntil; // last day of the series (inclusive)
+  final String? seriesId; // shared by every occurrence of one series
+
+  const StudySession({
+    required this.id,
+    required this.subjectId,
+    this.topicId,
+    required this.scheduledDate,
+    required this.startTime,
+    required this.endTime,
+    this.actualDuration,
+    this.status = SessionStatus.planned,
+    this.notes = '',
+    this.rating,
+    this.complete = false,
+    this.recurrence = SessionRecurrence.none,
+    this.recurrenceUntil,
+    this.seriesId,
+  });
+
+  /// Business rule: a session cannot be saved with an end time earlier
+  /// than or equal to its start time.
+  bool get isTimeRangeValid => endTime.isAfter(startTime);
+
+  /// True when this session is one occurrence of a repeating series.
+  bool get isRecurring => seriesId != null;
+
+  StudySession copyWith({
+    String? id,
+    String? subjectId,
+    String? topicId,
+    DateTime? scheduledDate,
+    DateTime? startTime,
+    DateTime? endTime,
+    int? actualDuration,
+    SessionStatus? status,
+    String? notes,
+    int? rating,
+    bool? complete,
+    SessionRecurrence? recurrence,
+    DateTime? recurrenceUntil,
+    String? seriesId,
+  }) {
+    return StudySession(
+      id: id ?? this.id,
+      subjectId: subjectId ?? this.subjectId,
+      topicId: topicId ?? this.topicId,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      actualDuration: actualDuration ?? this.actualDuration,
+      status: status ?? this.status,
+      notes: notes ?? this.notes,
+      rating: rating ?? this.rating,
+      complete: complete ?? this.complete,
+      recurrence: recurrence ?? this.recurrence,
+      recurrenceUntil: recurrenceUntil ?? this.recurrenceUntil,
+      seriesId: seriesId ?? this.seriesId,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'subjectId': subjectId,
+        'topicId': topicId,
+        'scheduledDate': scheduledDate.toIso8601String(),
+        'startTime': startTime.toIso8601String(),
+        'endTime': endTime.toIso8601String(),
+        'actualDuration': actualDuration,
+        'status': status.name,
+        'notes': notes,
+        'rating': rating,
+        'complete': complete ? 1 : 0,
+        'recurrence': recurrence.name,
+        'recurrenceUntil': recurrenceUntil?.toIso8601String(),
+        'seriesId': seriesId,
+      };
+
+  factory StudySession.fromMap(Map<String, dynamic> map) => StudySession(
+        id: map['id'] as String,
+        subjectId: map['subjectId'] as String,
+        topicId: map['topicId'] as String?,
+        scheduledDate: DateTime.parse(map['scheduledDate'] as String),
+        startTime: DateTime.parse(map['startTime'] as String),
+        endTime: DateTime.parse(map['endTime'] as String),
+        actualDuration: map['actualDuration'] as int?,
+        status: statusFromString(map['status'] as String),
+        notes: map['notes'] as String? ?? '',
+        rating: map['rating'] as int?,
+        complete: (map['complete'] as int) == 1,
+        // Older rows and older backups have no recurrence columns.
+        recurrence:
+            recurrenceFromString(map['recurrence'] as String? ?? 'none'),
+        recurrenceUntil: map['recurrenceUntil'] == null
+            ? null
+            : DateTime.parse(map['recurrenceUntil'] as String),
+        seriesId: map['seriesId'] as String?,
+      );
+}
+
+
+=== FILE: lib\models\exam.dart ===
+/// An exam the student is preparing for (V2 Step 11).
+class Exam {
+  final String id;
+  final String subjectId;
+  final String title;
+
+  /// Date and time of the exam, in the device's local time.
+  final DateTime examDate;
+  final String location;
+  final String notes;
+  final DateTime createdAt;
+
+  const Exam({
+    required this.id,
+    required this.subjectId,
+    required this.title,
+    required this.examDate,
+    this.location = '',
+    this.notes = '',
+    required this.createdAt,
+  });
+
+  Exam copyWith({
+    String? id,
+    String? subjectId,
+    String? title,
+    DateTime? examDate,
+    String? location,
+    String? notes,
+    DateTime? createdAt,
+  }) {
+    return Exam(
+      id: id ?? this.id,
+      subjectId: subjectId ?? this.subjectId,
+      title: title ?? this.title,
+      examDate: examDate ?? this.examDate,
+      location: location ?? this.location,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  /// Whole calendar days from today to the exam day (0 = today,
+  /// negative = already passed). The time of day is ignored.
+  int daysLeft([DateTime? now]) {
+    final today = now ?? DateTime.now();
+    final todayDay = DateTime.utc(today.year, today.month, today.day);
+    final examDay = DateTime.utc(examDate.year, examDate.month, examDate.day);
+    return examDay.difference(todayDay).inDays;
+  }
+
+  /// True once the exam day is behind us.
+  bool isPast([DateTime? now]) => daysLeft(now) < 0;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'subjectId': subjectId,
+        'title': title,
+        'examDate': examDate.toLocal().toIso8601String(),
+        'location': location,
+        'notes': notes,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory Exam.fromMap(Map<String, dynamic> map) => Exam(
+        id: map['id'] as String,
+        subjectId: map['subjectId'] as String,
+        title: map['title'] as String,
+        examDate: DateTime.parse(map['examDate'] as String),
+        location: (map['location'] as String?) ?? '',
+        notes: (map['notes'] as String?) ?? '',
+        createdAt: DateTime.parse(map['createdAt'] as String),
+      );
+}
+
+/// How far along the preparation checklist of one exam is.
+class ExamProgress {
+  final int prepared;
+  final int total;
+
+  const ExamProgress({required this.prepared, required this.total});
+
+  const ExamProgress.empty()
+      : prepared = 0,
+        total = 0;
+
+  /// 0.0 to 1.0 (0 when the exam has no topics yet).
+  double get fraction => total == 0 ? 0 : prepared / total;
+
+  int get percent => (fraction * 100).round();
+}
+
+
+=== FILE: lib\utils\date_utils.dart ===
+/// Small date helpers shared by Home, Timetable, and Progress —
+/// keeps "start of day" / "start of week" logic in one place.
+DateTime startOfDay(DateTime date) => DateTime(date.year, date.month, date.day);
+
+/// Monday-start week, matching the spec's "Week • September 8–14" style.
+DateTime startOfWeek(DateTime date) {
+  final day = startOfDay(date);
+  return day.subtract(Duration(days: day.weekday - DateTime.monday));
+}
+
+DateTime endOfWeek(DateTime date) =>
+    startOfWeek(date).add(const Duration(days: 7));
+
+bool isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+String formatDuration(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '${m}m';
+  if (m == 0) return '${h}h';
+  return '${h}h ${m}m';
+}
+
+String formatTimeOfDay(DateTime time) {
+  final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+  final minute = time.minute.toString().padLeft(2, '0');
+  final period = time.hour >= 12 ? 'PM' : 'AM';
+  return '$hour:$minute $period';
+}
+
+
+=== FILE: lib\utils\study_stats.dart ===
+import '../models/study_session.dart';
+import 'date_utils.dart';
+
+/// Sum of actualDuration (minutes) across completed sessions whose
+/// scheduledDate falls on [date].
+int completedMinutesForDate(List<StudySession> sessions, DateTime date) {
+  return sessions
+      .where((s) => s.complete && isSameDay(s.scheduledDate, date))
+      .fold(0, (sum, s) => sum + (s.actualDuration ?? 0));
+}
+
+/// Sum of actualDuration across completed sessions within [sessions],
+/// with no date filtering — pass in a week's worth of sessions to get
+/// a weekly total.
+int completedMinutesTotal(List<StudySession> sessions) {
+  return sessions
+      .where((s) => s.complete)
+      .fold(0, (sum, s) => sum + (s.actualDuration ?? 0));
+}
+
+/// Current study streak, per the V1 business rule: a day counts only
+/// if it has at least one completed session.
+///
+/// [completedDates] are yyyy-MM-dd strings from
+/// SessionRepository.getCompletedDates(). Today not yet having a
+/// completed session does not break the streak — it simply isn't
+/// counted yet, since the day isn't over.
+int currentStreak(Set<String> completedDates, {DateTime? today}) {
+  final now = today ?? DateTime.now();
+  var cursor = startOfDay(now);
+  var streak = 0;
+
+  bool hasSessionOn(DateTime day) => completedDates.contains(_dateKey(day));
+
+  // If today already has a completed session, count it and step back
+  // from yesterday. If not, today is skipped (not yet failed) and we
+  // start checking from yesterday.
+  if (hasSessionOn(cursor)) {
+    streak++;
+  }
+  cursor = cursor.subtract(const Duration(days: 1));
+
+  while (hasSessionOn(cursor)) {
+    streak++;
+    cursor = cursor.subtract(const Duration(days: 1));
+  }
+
+  return streak;
+}
+
+String _dateKey(DateTime date) {
+  final y = date.year.toString().padLeft(4, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  final d = date.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
+}
+
+/// Longest run of consecutive completed-session days on record, e.g.
+/// for the "Longest: 18 days" line on the Progress screen.
+int longestStreak(Set<String> completedDates) {
+  if (completedDates.isEmpty) return 0;
+
+  final sortedDates = completedDates.map((key) {
+    final parts = key.split('-');
+    return DateTime(
+        int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+  }).toList()
+    ..sort();
+
+  var longest = 1;
+  var current = 1;
+  for (var i = 1; i < sortedDates.length; i++) {
+    final gap = sortedDates[i].difference(sortedDates[i - 1]).inDays;
+    if (gap == 1) {
+      current++;
+      longest = current > longest ? current : longest;
+    } else if (gap > 1) {
+      current = 1;
+    }
+  }
+  return longest;
+}
+
+
+=== FILE: lib\screens\progress\progress_screen.dart ===
+import 'package:flutter/material.dart';
+
+import '../../app/route_observer.dart';
+import '../../core/data_refresh_bus.dart';
+import '../../core/refreshable_screen.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+import '../../utils/date_utils.dart';
+import '../../widgets/async_builder.dart';
+import '../../widgets/gradient_background.dart';
+import '../../widgets/insight_carousel.dart';
+import '../../widgets/study_bar_chart.dart';
+import 'progress_view_data.dart';
+import 'weekly_report_screen.dart';
+
+class ProgressScreen extends StatefulWidget {
+  const ProgressScreen({super.key});
+
+  @override
+  State<ProgressScreen> createState() => _ProgressScreenState();
+}
+
+class _ProgressScreenState extends State<ProgressScreen>
+    with RouteAware, RefreshableScreenMixin<ProgressScreen> {
+  ProgressPeriod _period = ProgressPeriod.week;
+  late Future<ProgressViewData> _future;
+
+  ModalRoute<dynamic>? _route;
+  bool _isRefreshing = false;
+  bool _refreshQueued = false;
+
+  /// Data scopes that make this screen reload itself automatically.
+  @override
+  List<RefreshScope> get watchedScopes => [
+        RefreshScope.sessions,
+        RefreshScope.subjects,
+      ];
+
+  @override
+  void initState() {
+    super.initState(); // RefreshableScreenMixin subscribes to the bus here.
+    _future = ProgressViewData.load(_period);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final route = ModalRoute.of(context);
+
+    if (route != null && route != _route) {
+      if (_route != null) {
+        routeObserver.unsubscribe(this);
+      }
+
+      _route = route;
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose(); // RefreshableScreenMixin cancels its subscription here.
+  }
+
+  @override
+  void didPopNext() {
+    // A screen that was above Progress has just closed, so data may
+    // have changed.
+    onRefresh();
+  }
+
+  void _selectPeriod(ProgressPeriod period) {
+    if (_period == period) return;
+
+    setState(() {
+      _period = period;
+      _future = ProgressViewData.load(period);
+    });
+  }
+
+  /// Used by pull-to-refresh, the DataRefreshBus and returning from
+  /// another screen. A refresh requested while one is already running
+  /// is queued and runs right after, so the screen never ends up stale.
+  @override
+  Future<void> onRefresh() async {
+    if (!mounted) return;
+
+    if (_isRefreshing) {
+      _refreshQueued = true;
+      return;
+    }
+
+    _isRefreshing = true;
+
+    try {
+      do {
+        _refreshQueued = false;
+
+        final next = ProgressViewData.load(_period);
+
+        if (!mounted) {
+          next.ignore();
+          return;
+        }
+
+        setState(() => _future = next);
+
+        try {
+          await next;
+        } catch (_) {
+          // AsyncBuilder shows the error state.
+        }
+      } while (_refreshQueued && mounted);
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  String _periodLabel(ProgressPeriod period) {
+    switch (period) {
+      case ProgressPeriod.week:
+        return 'Weekly study time';
+      case ProgressPeriod.month:
+        return 'Monthly study time';
+      case ProgressPeriod.allTime:
+        return 'All-time study time';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(
+                title: const Text('Progress'),
+                actions: [
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const WeeklyReportScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.insights_rounded, size: 18),
+                    label: const Text('Weekly report'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+                leading: const BackButton(),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    0,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your study performance',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: context.secondaryText,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<ProgressPeriod>(
+                          style: SegmentedButton.styleFrom(
+                            selectedBackgroundColor: AppColors.primarySoft,
+                            selectedForegroundColor: AppColors.primaryDark,
+                          ),
+                          segments: const [
+                            ButtonSegment(
+                              value: ProgressPeriod.week,
+                              label: Text('Week'),
+                            ),
+                            ButtonSegment(
+                              value: ProgressPeriod.month,
+                              label: Text('Month'),
+                            ),
+                            ButtonSegment(
+                              value: ProgressPeriod.allTime,
+                              label: Text('All time'),
+                            ),
+                          ],
+                          selected: {_period},
+                          onSelectionChanged: (s) => _selectPeriod(s.first),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Expanded(
+                        child: AsyncBuilder<ProgressViewData>(
+                          future: _future,
+                          errorMessage: 'Could not load your progress.',
+                          onRetry: () => onRefresh(),
+                          builder: (context, data) {
+                            return buildRefreshable(
+                              child: ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  _SummaryCard(
+                                    data: data,
+                                    label: _periodLabel(_period),
+                                  ),
+                                  const SizedBox(height: AppSpacing.lg),
+                                  if (data.subjectPerformancePercent
+                                      .isNotEmpty) ...[
+                                    Text(
+                                      'Subject performance',
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    _SubjectPerformanceCard(data: data),
+                                    const SizedBox(height: AppSpacing.lg),
+                                  ],
+                                  _StreakCard(data: data),
+                                  if (data.insights.isNotEmpty) ...[
+                                    const SizedBox(height: AppSpacing.lg),
+                                    Text(
+                                      'Insights',
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    InsightCarousel(insights: data.insights),
+                                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Total time, target, percent of target and the bar chart.
+class _SummaryCard extends StatelessWidget {
+  final ProgressViewData data;
+  final String label;
+
+  const _SummaryCard({required this.data, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final percent = data.targetMinutes == 0
+        ? null
+        : (data.totalMinutes / data.targetMinutes * 100).round();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: context.secondaryText,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatDuration(data.totalMinutes),
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (percent != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                  ),
+                  child: Text(
+                    '$percent% of target',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Text(
+            'Target: ${formatDuration(data.targetMinutes)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: context.secondaryText,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          if (data.chartPoints.isNotEmpty)
+            StudyBarChart(
+              points: data.chartPoints,
+              highlightIndex: data.period == ProgressPeriod.week
+                  ? DateTime.now().weekday - 1
+                  : null,
+            ),
+          if (data.chartPoints.isEmpty || data.totalMinutes == 0) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'No completed sessions yet.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: context.secondaryText,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One progress bar per subject, in the subject's own colour.
+class _SubjectPerformanceCard extends StatelessWidget {
+  final ProgressViewData data;
+
+  const _SubjectPerformanceCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final trackColor = context.isDarkMode
+        ? AppColors.surfaceDarkAlt
+        : AppColors.backgroundGradientTop;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        children: data.subjectPerformancePercent.entries.map((entry) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        entry.key.name,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text('${entry.value}%'),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: entry.value / 100,
+                    minHeight: 6,
+                    backgroundColor: trackColor,
+                    valueColor: AlwaysStoppedAnimation(
+                      Color(entry.key.colorValue),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+/// Current streak and longest streak.
+class _StreakCard extends StatelessWidget {
+  final ProgressViewData data;
+
+  const _StreakCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.local_fire_department_rounded,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            '${data.streak} day streak',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            'Longest: ${data.longestStreak} days',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: context.secondaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+=== FILE: lib\screens\timetable\timetable_screen.dart ===
+import 'package:flutter/material.dart';
+import '../../core/data_refresh_bus.dart';
+import '../../core/refreshable_screen.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+import '../../widgets/timeline_event_card.dart';
+import '../../widgets/pastel_card.dart';
+import '../../widgets/async_builder.dart';
+import '../../widgets/gradient_background.dart';
+import '../../utils/date_utils.dart';
+import 'timetable_view_data.dart';
+import 'add_edit_session_screen.dart';
+
+class TimetableScreen extends StatefulWidget {
+  /// True when this screen is pushed on its own (e.g. from Home's
+  /// "View all") rather than shown as a tab body inside MainScaffold.
+  /// MainScaffold already supplies the gradient background and bottom
+  /// nav for the tab case, so this screen must not duplicate that —
+  /// but a standalone push needs its own Scaffold, background, and
+  /// back button, or it renders on a bare, unstyled surface.
+  final bool standalone;
+
+  const TimetableScreen({super.key, this.standalone = false});
+
+  @override
+  State<TimetableScreen> createState() => _TimetableScreenState();
+}
+
+class _TimetableScreenState extends State<TimetableScreen>
+    with RefreshableScreenMixin<TimetableScreen> {
+  late DateTime _selectedDay;
+  late Future<TimetableWeekData> _future;
+
+  /// Last week of data that finished loading. Only used to draw the
+  /// small "has sessions" dots under the day selector.
+  TimetableWeekData? _loadedData;
+  DateTime? _loadedWeekStart;
+
+  /// Data scopes that make this screen reload itself automatically.
+  @override
+  List<RefreshScope> get watchedScopes => [
+        RefreshScope.sessions,
+        RefreshScope.subjects,
+      ];
+
+  @override
+  void initState() {
+    super.initState(); // RefreshableScreenMixin subscribes to the bus here.
+    _selectedDay = startOfDay(DateTime.now());
+    _future = _load();
+  }
+
+  /// Loads the week that contains [_selectedDay] and remembers it for
+  /// the day dots, but only if that week is still the one on screen.
+  Future<TimetableWeekData> _load() {
+    final weekStart = startOfWeek(_selectedDay);
+    return TimetableWeekData.load(_selectedDay).then((data) {
+      if (mounted && startOfWeek(_selectedDay) == weekStart) {
+        setState(() {
+          _loadedData = data;
+          _loadedWeekStart = weekStart;
+        });
+      }
+      return data;
+    });
+  }
+
+  /// Used by pull-to-refresh, the retry button, the DataRefreshBus
+  /// (a session was saved, deleted or synced) and "Today".
+  @override
+  Future<void> onRefresh() async {
+    if (!mounted) return;
+    final next = _load();
+    setState(() => _future = next);
+    try {
+      await next;
+    } catch (_) {
+      // AsyncBuilder shows the error state with a retry button.
+    }
+  }
+
+  void _selectDay(DateTime day) => setState(() => _selectedDay = day);
+
+  void _shiftWeek(int deltaWeeks) {
+    setState(() {
+      _selectedDay = DateTime(
+        _selectedDay.year,
+        _selectedDay.month,
+        _selectedDay.day + 7 * deltaWeeks,
+      );
+      _future = _load();
+    });
+  }
+
+  void _goToToday() {
+    setState(() {
+      _selectedDay = startOfDay(DateTime.now());
+      _future = _load();
+    });
+  }
+
+  PastelHue _hueFor(int colorValue) {
+    if (colorValue == AppColors.accentGreenStrong.value) return PastelHue.green;
+    if (colorValue == AppColors.accentBlueStrong.value) return PastelHue.blue;
+    return PastelHue.purple;
+  }
+
+  /// True when the week on screen has at least one session on [day].
+  bool _hasSessionsOn(DateTime day) {
+    final data = _loadedData;
+    if (data == null) return false;
+    if (_loadedWeekStart != startOfWeek(day)) return false;
+    return data.forDay(day).isNotEmpty;
+  }
+
+  Future<void> _openCreate() async {
+    // The session form notifies DataRefreshBus on save, which reloads
+    // this screen through RefreshableScreenMixin.
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AddEditSessionScreen(initialDate: _selectedDay),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final weekStart = startOfWeek(_selectedDay);
+    final isOnToday = isSameDay(_selectedDay, DateTime.now());
+    final bottomPadding = widget.standalone ? 24.0 : 96.0;
+
+    final content = Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Timetable',
+                  style: Theme.of(context).textTheme.headlineSmall),
+              IconButton(
+                icon: const Icon(
+                  Icons.add_circle_rounded,
+                  size: 28,
+                  color: AppColors.primary,
+                ),
+                tooltip: 'Plan a session',
+                onPressed: _openCreate,
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                tooltip: 'Previous week',
+                onPressed: () => _shiftWeek(-1),
+              ),
+              Flexible(
+                child: Text(
+                  _weekRangeLabel(weekStart),
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: context.secondaryText,
+                      ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                tooltip: 'Next week',
+                onPressed: () => _shiftWeek(1),
+              ),
+              const Spacer(),
+              if (!isOnToday)
+                TextButton(
+                  onPressed: _goToToday,
+                  child: const Text(
+                    'Today',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _DaySelector(
+            weekStart: weekStart,
+            selectedDay: _selectedDay,
+            onSelect: _selectDay,
+            hasSessions: _hasSessionsOn,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Expanded(
+            child: AsyncBuilder<TimetableWeekData>(
+              future: _future,
+              errorMessage: 'Could not load your timetable.',
+              onRetry: onRefresh,
+              builder: (context, week) {
+                final sessions = week.forDay(_selectedDay);
+
+                if (sessions.isEmpty) {
+                  return buildRefreshable(
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: 240,
+                          child: Center(
+                            child: Text(
+                              'No sessions this day — tap + to plan one.',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: context.secondaryText),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return buildRefreshable(
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(bottom: bottomPadding),
+                    itemCount: sessions.length,
+                    itemBuilder: (context, index) {
+                      final session = sessions[index];
+                      final subject = week.subjectsById[session.subjectId];
+                      final topic = session.topicId != null
+                          ? week.topicsById[session.topicId]
+                          : null;
+
+                      final status = session.complete ? 'Completed' : 'Planned';
+
+                      return TimelineEventCard(
+                        timeRange:
+                            '${formatTimeOfDay(session.startTime)} - ${formatTimeOfDay(session.endTime)}',
+                        title: subject?.name ?? 'Unknown subject',
+                        subtitle: topic?.name ?? 'Study session',
+                        meta: session.isRecurring ? '$status · Weekly' : status,
+                        hue: subject != null
+                            ? _hueFor(subject.colorValue)
+                            : PastelHue.blue,
+                        isLast: index == sessions.length - 1,
+                        onTap: () async {
+                          // The session form notifies DataRefreshBus on
+                          // save/delete, which reloads this screen.
+                          await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AddEditSessionScreen(existing: session),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!widget.standalone) return content;
+
+    return Scaffold(
+      body: GradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              AppBar(
+                  title: const Text('Timetable'), leading: const BackButton()),
+              Expanded(child: content),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _weekRangeLabel(DateTime weekStart) {
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    const shortMonths = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    if (weekStart.month == weekEnd.month) {
+      final month = months[weekStart.month - 1];
+      return 'Week • $month ${weekStart.day}–${weekEnd.day}';
+    }
+
+    // The week crosses two months, e.g. "Sep 28 – Oct 4".
+    final startMonth = shortMonths[weekStart.month - 1];
+    final endMonth = shortMonths[weekEnd.month - 1];
+    return 'Week • $startMonth ${weekStart.day} – $endMonth ${weekEnd.day}';
+  }
+}
+
+class _DaySelector extends StatelessWidget {
+  final DateTime weekStart;
+  final DateTime selectedDay;
+  final ValueChanged<DateTime> onSelect;
+  final bool Function(DateTime day) hasSessions;
+
+  const _DaySelector({
+    required this.weekStart,
+    required this.selectedDay,
+    required this.onSelect,
+    required this.hasSessions,
+  });
+
+  static const _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(7, (i) {
+        final day =
+            DateTime(weekStart.year, weekStart.month, weekStart.day + i);
+        final selected = isSameDay(day, selectedDay);
+        final isToday = isSameDay(day, DateTime.now());
+        final busy = hasSessions(day);
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onSelect(day),
+          child: Column(
+            children: [
+              Text(
+                _labels[i],
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.secondaryText,
+                      fontWeight: isToday ? FontWeight.w700 : FontWeight.w400,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: isToday && !selected
+                      ? Border.all(color: AppColors.primary, width: 1.5)
+                      : null,
+                ),
+                child: Text(
+                  '${day.day}',
+                  style: TextStyle(
+                    color: selected ? Colors.white : context.primaryText,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: busy ? AppColors.teal : Colors.transparent,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}
+
+
+=== FILE: lib\screens\more\more_screen.dart ===
+import 'package:flutter/material.dart';
+
+import '../../app/theme_controller.dart';
+import '../../repositories/settings_repository.dart';
+import '../../services/notification_service.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/theme_helpers.dart';
+import '../../utils/date_utils.dart';
+import '../../widgets/async_builder.dart';
+import '../../features/auth/auth_service.dart';
+import '../../features/auth/password_prompt_card.dart';
+import '../../features/auth/set_password_screen.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import '../../features/auth/auth_diagnostics_screen.dart';
+import '../progress/progress_screen.dart';
+import '../tasks/tasks_screen.dart';
+import 'backup_screen.dart';
+import 'edit_goals_screen.dart';
+import 'edit_profile_screen.dart';
+import 'more_view_data.dart';
+
+class MoreScreen extends StatefulWidget {
+  const MoreScreen({super.key});
+
+  @override
+  State<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
+  late Future<MoreViewData> _future;
+
+  final _settingsRepo = SettingsRepository();
+
+  bool? _notificationOverride;
+  bool _isUpdatingNotifications = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
+    _future = MoreViewData.load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reload();
+    }
+  }
+
+  Future<void> _reload() async {
+    final next = MoreViewData.load();
+
+    if (!mounted) return;
+
+    setState(() {
+      _future = next;
+    });
+
+    try {
+      await next;
+
+      if (!mounted) return;
+
+      setState(() {
+        _notificationOverride = null;
+      });
+    } catch (_) {
+      // AsyncBuilder handles the error state.
+    }
+  }
+
+  Future<void> _toggleNotifications(bool enabled) async {
+    if (_isUpdatingNotifications) return;
+
+    setState(() {
+      _notificationOverride = enabled;
+      _isUpdatingNotifications = true;
+    });
+
+    try {
+      final current = await _settingsRepo.get();
+
+      await _settingsRepo.save(
+        current.copyWith(
+          notificationsEnabled: enabled,
+        ),
+      );
+
+      try {
+        if (enabled) {
+          await NotificationService.instance.scheduleDailyGoalReminder(
+            const TimeOfDay(hour: 19, minute: 0),
+          );
+        } else {
+          await NotificationService.instance.cancelDailyGoalReminder();
+        }
+      } catch (_) {
+        // The setting was already saved.
+        // A notification-service failure should not undo the UI change.
+      }
+
+      if (!mounted) return;
+
+      final next = MoreViewData.load();
+
+      setState(() {
+        _future = next;
+      });
+
+      try {
+        await next;
+      } catch (_) {
+        // AsyncBuilder handles the error state.
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _notificationOverride = null;
+        _isUpdatingNotifications = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _notificationOverride = null;
+        _isUpdatingNotifications = false;
+      });
+
+      await _reload();
+    }
+  }
+
+  /// Asks for confirmation, then signs out through Supabase.
+  /// AuthGate listens to the auth stream and switches to the Sign In
+  /// screen by itself, so no manual navigation is needed here.
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'You will need to sign in again to use your account on this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text(
+              'Sign out',
+              style: TextStyle(color: Color(0xFFD64545)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await AuthService.instance.signOut();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AuthService.friendlyError(e))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AsyncBuilder<MoreViewData>(
+      future: _future,
+      errorMessage: 'Could not load your profile.',
+      onRetry: _reload,
+      builder: (context, data) {
+        final student = data.student;
+
+        final notificationsEnabled =
+            _notificationOverride ?? data.settings.notificationsEnabled;
+
+        // Only show the Sign out card when Supabase is running and
+        // someone is actually signed in.
+        final authUser =
+            AuthService.isAvailable ? AuthService.instance.currentUser : null;
+
+        return RefreshIndicator(
+          onRefresh: _reload,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg + MediaQuery.of(context).padding.bottom + 96,
+            ),
+            children: [
+              Text(
+                'More',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              const PasswordPromptCard(),
+
+              _SectionCard(
+                onTap: () async {
+                  final changed = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => EditProfileScreen(
+                        student: student,
+                      ),
+                    ),
+                  );
+
+                  if (changed == true && mounted) {
+                    await _reload();
+                  }
+                },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.accentPurpleStrong,
+                      child: Text(
+                        student.name.isNotEmpty
+                            ? student.name[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            student.name,
+                            style: TextStyle(
+                              color: context.primaryText,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Level ${student.level} • ${student.program}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                onTap: () async {
+                  final changed = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => EditGoalsScreen(
+                        student: student,
+                      ),
+                    ),
+                  );
+
+                  if (changed == true && mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Study Goals',
+                  'Daily ${formatDuration(student.dailyGoalMinutes)} • '
+                      'Weekly ${formatDuration(student.weeklyGoalMinutes)}',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Notifications',
+                      style: TextStyle(
+                        color: context.primaryText,
+                      ),
+                    ),
+                    Switch(
+                      value: notificationsEnabled,
+                      activeColor: AppColors.accentPurpleStrong,
+                      onChanged: _isUpdatingNotifications
+                          ? null
+                          : _toggleNotifications,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Appearance',
+                      style: TextStyle(
+                        color: context.primaryText,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ValueListenableBuilder<ThemeMode>(
+                      valueListenable: ThemeController.instance.mode,
+                      builder: (context, mode, _) {
+                        return SegmentedButton<ThemeMode>(
+                          segments: const [
+                            ButtonSegment(
+                              value: ThemeMode.system,
+                              label: Text('System'),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.light,
+                              label: Text('Light'),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.dark,
+                              label: Text('Dark'),
+                            ),
+                          ],
+                          selected: {mode},
+                          onSelectionChanged: (s) {
+                            ThemeController.instance.setMode(s.first);
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ProgressScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Progress',
+                  'Charts, streak, insights',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+              _SectionCard(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TasksScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Tasks',
+                  'Assignments, readings, revision',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BackupScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Data & Backup',
+                  'Export or import',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              // ---- V2: set or change password ----
+              if (authUser != null) ...[
+                _SectionCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SetPasswordScreen(),
+                    ),
+                  ),
+                  child: _rowLabelValue('Password', 'Set or change'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              // ---- V2: debug-only auth diagnostics ----
+              if (kDebugMode) ...[
+                _SectionCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AuthDiagnosticsScreen(),
+                    ),
+                  ),
+                  child: _rowLabelValue('Auth diagnostics', 'Debug only'),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              // ---- V2: Account / Sign out ----
+              if (authUser != null) ...[
+                _SectionCard(
+                  onTap: _confirmSignOut,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.logout_rounded,
+                        color: Color(0xFFD64545),
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Sign out',
+                              style: TextStyle(
+                                color: Color(0xFFD64545),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if ((authUser.email ?? '').isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                authUser.email!,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+
+              _SectionCard(
+                onTap: () {
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Study Architect',
+                    applicationVersion: 'V1',
+                    children: const [
+                      Text(
+                        'A local-first study planning and tracking app.',
+                      ),
+                    ],
+                  );
+                },
+                child: _rowLabelValue(
+                  'About',
+                  'Study Architect V1',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _rowLabelValue(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: context.primaryText,
+          ),
+        ),
+        Row(
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textSecondary,
+              size: 18,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _SectionCard({
+    required this.child,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final card = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: context.cardSurface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: child,
+    );
+
+    if (onTap == null) {
+      return card;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: onTap,
+        child: card,
+      ),
+    );
+  }
+}
+
+
+=== FILE: lib\theme\app_theme.dart ===
+import 'package:flutter/material.dart';
+
+/// Design tokens for Study Architect V2 (teal-green + navy reference sheet).
+/// Single source of truth for colours. Estimated from the reference image:
+/// adjust the hex values here and the whole app follows.
+class AppColors {
+  AppColors._();
+
+  // Brand
+  static const primary = Color(0xFF16A37F);
+  static const primaryDark = Color(0xFF0E8A6B);
+  static const primarySoft = Color(0xFFD9F2EA);
+  static const teal = Color(0xFF1FD0B5);
+
+  // Page background gradients
+  static const backgroundGradientTop = Color(0xFFF1F7F6);
+  static const backgroundGradientBottom = Color(0xFFE4EEF2);
+  static const darkBackgroundGradientTop = Color(0xFF0F1B2E);
+  static const darkBackgroundGradientBottom = Color(0xFF0A1220);
+
+  // Surfaces
+  static const surfaceLight = Color(0xFFF7FAFA);
+  static const surfaceLightAlt = Color(0xFFFFFFFF);
+  static const surfaceDark = Color(0xFF16233A);
+  static const surfaceDarkAlt = Color(0xFF1B2A44);
+
+  // Tinted cards (classes, tasks, timetable events)
+  static const accentBlue = Color(0xFFDCE9FB);
+  static const accentPurple = Color(0xFFE9E1FA);
+  static const accentGreen = Color(0xFFD6F1E6);
+
+  // Saturated versions (timeline dots, charts, subject colours)
+  static const accentBlueStrong = Color(0xFF4C8DF6);
+  static const accentPurpleStrong = Color(0xFF8B6FE0);
+  static const accentGreenStrong = Color(0xFF1FB57F);
+
+  // Text
+  static const textPrimary = Color(0xFF14213D);
+  static const textSecondary = Color(0xFF6B7A90);
+  static const textPrimaryDark = Color(0xFFEAF1FA);
+  static const textSecondaryDark = Color(0xFF93A4BE);
+
+  // Nav bar
+  static const navInactive = Color(0xFFA9B5C4);
+  static const navInactiveDark = Color(0xFF56657F);
+
+  // Destructive actions
+  static const danger = Color(0xFFD64545);
+
+  // Theme-aware helpers
+  static bool isDark(BuildContext c) =>
+      Theme.of(c).brightness == Brightness.dark;
+  static Color primaryText(BuildContext c) =>
+      isDark(c) ? textPrimaryDark : textPrimary;
+  static Color secondaryText(BuildContext c) =>
+      isDark(c) ? textSecondaryDark : textSecondary;
+  static Color card(BuildContext c) =>
+      isDark(c) ? surfaceDarkAlt : surfaceLightAlt;
+}
+
+class AppRadii {
+  AppRadii._();
+  static const outer = 24.0;
+  static const card = 16.0;
+  static const cardSmall = 14.0;
+  static const control = 10.0;
+  static const button = 14.0;
+}
+
+class AppSpacing {
+  AppSpacing._();
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 24.0;
+}
+
+
+=== FILE: lib\widgets\study_bar_chart.dart ===
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+
+import '../theme/app_theme.dart';
+import '../theme/theme_helpers.dart';
+import '../utils/date_utils.dart';
+import 'simple_bar_chart.dart';
+
+/// V2 Step 10a: fl_chart bar chart for study time (values are minutes).
+///
+/// Takes the same [BarChartPoint] list as the old SimpleBarChart, so the
+/// existing ProgressViewData does not need to change. Shows grid lines,
+/// time labels on the left, rounded bars and a tap tooltip.
+/// [highlightIndex] draws one bar darker (for example today).
+class StudyBarChart extends StatelessWidget {
+  final List<BarChartPoint> points;
+  final double height;
+  final int? highlightIndex;
+
+  const StudyBarChart({
+    super.key,
+    required this.points,
+    this.height = 200,
+    this.highlightIndex,
+  });
+
+  /// Grid step candidates in minutes. The smallest one that keeps the
+  /// chart to about 5 grid lines is used.
+  static const _steps = [30, 60, 120, 180, 300, 600, 1200, 3000, 6000];
+
+  static int _stepFor(int maxMinutes) {
+    for (final step in _steps) {
+      if (maxMinutes <= step * 5) return step;
+    }
+    return _steps.last;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxMinutes = points.fold<int>(
+      0,
+      (m, p) => p.value > m ? p.value : m,
+    );
+    final step = _stepFor(maxMinutes);
+    // Always leave some headroom above the tallest bar.
+    final maxY = (((maxMinutes ~/ step) + 1) * step).toDouble();
+
+    final gridColor = context.secondaryText.withValues(alpha: 0.18);
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: context.secondaryText,
+        );
+    final barWidth = points.length > 8 ? 10.0 : 18.0;
+
+    final groups = List.generate(points.length, (i) {
+      final isHighlight = highlightIndex == i;
+      return BarChartGroupData(
+        x: i,
+        barRods: [
+          BarChartRodData(
+            toY: points[i].value.toDouble(),
+            width: barWidth,
+            color: isHighlight ? AppColors.primaryDark : AppColors.primary,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(5),
+            ),
+          ),
+        ],
+      );
+    });
+
+    return Semantics(
+      label: 'Study time bar chart',
+      child: SizedBox(
+        height: height,
+        child: BarChart(
+          BarChartData(
+            maxY: maxY,
+            minY: 0,
+            alignment: BarChartAlignment.spaceAround,
+            barGroups: groups,
+            borderData: FlBorderData(show: false),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: step.toDouble(),
+              getDrawingHorizontalLine: (value) =>
+                  FlLine(color: gridColor, strokeWidth: 1),
+            ),
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 28,
+                  getTitlesWidget: (value, meta) {
+                    final i = value.toInt();
+                    if (i < 0 || i >= points.length) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(points[i].label, style: labelStyle),
+                    );
+                  },
+                ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 40,
+                  interval: step.toDouble(),
+                  getTitlesWidget: (value, meta) {
+                    final text =
+                        value == 0 ? '0' : formatDuration(value.round());
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        text,
+                        textAlign: TextAlign.right,
+                        style: labelStyle,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            barTouchData: BarTouchData(
+              enabled: true,
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipColor: (_) => AppColors.primaryDark,
+                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                  return BarTooltipItem(
+                    formatDuration(rod.toY.round()),
+                    const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

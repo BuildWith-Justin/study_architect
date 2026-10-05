@@ -12,6 +12,7 @@ import '../../features/auth/password_prompt_card.dart';
 import '../../features/auth/set_password_screen.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../features/auth/auth_diagnostics_screen.dart';
+import '../calendar/calendar_screen.dart';
 import '../progress/progress_screen.dart';
 import '../tasks/tasks_screen.dart';
 import 'backup_screen.dart';
@@ -367,6 +368,25 @@ class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
 
               const SizedBox(height: AppSpacing.md),
 
+              _SectionCard(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CalendarScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Calendar',
+                  'Month view, study heatmap',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
               _SectionCard(
                 onTap: () async {
                   await Navigator.of(context).push(
