@@ -11,7 +11,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'study_architect.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 6;
 
   Database? _db;
 
@@ -30,12 +30,14 @@ class DatabaseService {
         await _createSchema(db, version);
         await applySyncSchema(db);
         await _addExams(db);
+        await _addGamification(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await applySyncSchema(db);
         if (oldVersion < 3) await _addSessionRecurrence(db);
         if (oldVersion < 4) await _addTopicSortOrder(db);
         if (oldVersion < 5) await _addExams(db);
+        if (oldVersion < 6) await _addGamification(db);
       },
       // sqflite does not enforce foreign keys by default — turn them on
       // so the ON DELETE CASCADE / SET NULL rules above actually run.
@@ -123,6 +125,40 @@ class DatabaseService {
     await applyExamSyncSchema(db);
   }
 
+  /// V2 Step 13: gamification. xp_log is the append-only ledger of every
+  /// XP award (one row per source, so the same session or task can never
+  /// pay twice); achievements holds the badges already unlocked. Both
+  /// tables are synced to the cloud. Level, streak bonus and progress are
+  /// always computed from these rows, never stored.
+  Future<void> _addGamification(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS xp_log (
+        id TEXT PRIMARY KEY,
+        sourceType TEXT NOT NULL,
+        sourceId TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        reason TEXT NOT NULL DEFAULT '',
+        earnedAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS achievements (
+        id TEXT PRIMARY KEY,
+        unlockedAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_xp_log_source ON xp_log (sourceType, sourceId)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_xp_log_earned ON xp_log (earnedAt)',
+    );
+
+    await applyGamificationSyncSchema(db);
+  }
+
   Future<void> _createSchema(Database db, int version) async {
     await db.execute('''
       CREATE TABLE students (
@@ -208,6 +244,8 @@ class DatabaseService {
   /// "Clear All Data" danger-zone action in Step 14.
   Future<void> clearAllData() async {
     final db = await database;
+    await db.delete('xp_log');
+    await db.delete('achievements');
     await db.delete('exam_topics');
     await db.delete('exams');
     await db.delete('tasks');
@@ -233,9 +271,13 @@ class DatabaseService {
     required List<Map<String, dynamic>> tasks,
     List<Map<String, dynamic>> exams = const [],
     List<Map<String, dynamic>> examTopics = const [],
+    List<Map<String, dynamic>> xpLog = const [],
+    List<Map<String, dynamic>> achievements = const [],
   }) async {
     final db = await database;
     await db.transaction((txn) async {
+      await txn.delete('xp_log');
+      await txn.delete('achievements');
       await txn.delete('exam_topics');
       await txn.delete('exams');
       await txn.delete('tasks');
@@ -268,6 +310,12 @@ class DatabaseService {
       }
       for (final row in examTopics) {
         await txn.insert('exam_topics', row);
+      }
+      for (final row in xpLog) {
+        await txn.insert('xp_log', row);
+      }
+      for (final row in achievements) {
+        await txn.insert('achievements', row);
       }
     });
   }

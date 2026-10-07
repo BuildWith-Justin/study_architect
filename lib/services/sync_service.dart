@@ -25,6 +25,8 @@ const _tables = [
   _SyncTable('tasks'),
   _SyncTable('exams'),
   _SyncTable('exam_topics'),
+  _SyncTable('achievements'),
+  _SyncTable('xp_log'),
 ];
 
 /// UTC ISO-8601 with millisecond precision — the same shape SQLite writes,

@@ -8,6 +8,7 @@ import '../../repositories/session_repository.dart';
 import '../../repositories/subject_repository.dart';
 import '../../repositories/topic_repository.dart';
 import '../../services/notification_service.dart';
+import '../../gamification/gamification_hooks.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../utils/date_utils.dart';
@@ -386,6 +387,12 @@ class _AddEditSessionScreenState extends State<AddEditSessionScreen> {
 
       await _scheduleReminders(toRemind);
 
+      // V2 Step 13: a completed session that was edited (for example moved
+      // to another day) keeps its XP in line.
+      if (_isEditing && base.complete) {
+        await GamificationHooks.sessionCompleted(base);
+      }
+
       DataRefreshBus.instance.notify(RefreshScope.sessions);
 
       if (!mounted) return;
@@ -481,9 +488,13 @@ class _AddEditSessionScreenState extends State<AddEditSessionScreen> {
           fromDate: existing.scheduledDate,
         );
         await _cancelReminders(removed.map((s) => s.id).toList());
+        await GamificationHooks.sessionsRemoved(
+          removed.map((s) => s.id).toList(),
+        );
       } else {
         await _sessionRepo.delete(existing.id);
         await _cancelReminders([existing.id]);
+        await GamificationHooks.sessionRemoved(existing.id);
       }
 
       DataRefreshBus.instance.notify(RefreshScope.sessions);

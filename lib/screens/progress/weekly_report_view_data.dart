@@ -1,3 +1,4 @@
+import '../../gamification/gamification_engine.dart';
 import '../../models/study_session.dart';
 import '../../models/subject.dart';
 import '../../repositories/session_repository.dart';
@@ -125,7 +126,6 @@ class WeeklyReportViewData {
     final subjects = await subjectRepo.getAll();
     final subjectsById = {for (final s in subjects) s.id: s};
     final all = await sessionRepo.getForRange(lastWeekStart, weekEnd);
-    final completedDates = await sessionRepo.getCompletedDates();
 
     // The repository range is inclusive at both ends, so filter again
     // here to keep each week strictly [start, nextStart).
@@ -188,7 +188,9 @@ class WeeklyReportViewData {
       topSubject: breakdown.isEmpty ? null : breakdown.first,
       subjectBreakdown: breakdown,
       averageRating: averageRating,
-      streak: currentStreak(completedDates, today: now),
+      streak: (await GamificationEngine.instance.getStreakInfo(now: now))
+          .current
+          .length,
     );
   }
 }

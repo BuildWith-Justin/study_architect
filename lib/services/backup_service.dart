@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../repositories/achievement_repository.dart';
 import '../repositories/exam_repository.dart';
 import '../repositories/session_repository.dart';
 import '../repositories/settings_repository.dart';
@@ -9,6 +10,7 @@ import '../repositories/student_repository.dart';
 import '../repositories/subject_repository.dart';
 import '../repositories/task_repository.dart';
 import '../repositories/topic_repository.dart';
+import '../repositories/xp_repository.dart';
 import 'database_service.dart';
 
 /// The export/import format is just each model's existing toMap()
@@ -42,6 +44,11 @@ class BackupService {
     final exams = await examRepo.getAll();
     final examTopics = await examRepo.getAllTopicLinks();
 
+    // V2 Step 13: XP ledger and unlocked badges. Older backups simply do
+    // not have these two keys.
+    final xpLog = await XpRepository().getAll();
+    final achievements = await AchievementRepository().getAll();
+
     return {
       'version': _currentVersion,
       'exportedAt': DateTime.now().toIso8601String(),
@@ -53,6 +60,8 @@ class BackupService {
       'tasks': tasks.map((t) => t.toMap()).toList(),
       'exams': exams.map((e) => e.toMap()).toList(),
       'examTopics': examTopics.map((l) => l.toMap()).toList(),
+      'xpLog': xpLog.map((x) => x.toMap()).toList(),
+      'achievements': achievements.map((a) => a.toMap()).toList(),
     };
   }
 
@@ -109,6 +118,8 @@ class BackupService {
       tasks: _asMapList(backup['tasks']),
       exams: _asMapList(backup['exams']),
       examTopics: _asMapList(backup['examTopics']),
+      xpLog: _asMapList(backup['xpLog']),
+      achievements: _asMapList(backup['achievements']),
     );
   }
 

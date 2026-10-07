@@ -1,3 +1,4 @@
+import '../../gamification/gamification_engine.dart';
 import '../../models/study_session.dart';
 import '../../models/subject.dart';
 import '../../repositories/session_repository.dart';
@@ -5,7 +6,6 @@ import '../../repositories/student_repository.dart';
 import '../../repositories/subject_repository.dart';
 import '../../utils/date_utils.dart';
 import '../../utils/study_stats.dart';
-import '../../utils/study_stats.dart' as study_stats;
 import '../../utils/study_insights.dart';
 import '../../widgets/simple_bar_chart.dart';
 
@@ -39,7 +39,6 @@ class ProgressViewData {
 
     final student = await studentRepo.getCurrent();
     final subjects = await subjectRepo.getAll();
-    final completedDates = await sessionRepo.getCompletedDates();
     final now = DateTime.now();
 
     List<StudySession> periodSessions;
@@ -154,8 +153,13 @@ class ProgressViewData {
       subjectPerformance[subject] = percent;
     }
 
-    final streak = currentStreak(completedDates, today: now);
-    final longest = study_stats.longestStreak(completedDates);
+    // V2 Step 13: the same streak rule as Home (10+ minutes a day, one
+    // forgiven missed day per week).
+    final streakInfo = await GamificationEngine.instance.getStreakInfo(
+      now: now,
+    );
+    final streak = streakInfo.current.length;
+    final longest = streakInfo.best;
 
     final insights = generateInsights(
       todayMinutes:

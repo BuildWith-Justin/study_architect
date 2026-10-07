@@ -106,3 +106,24 @@ Future<void> applyExamSyncSchema(Database db) async {
     await _stampAndCreateTriggers(db, t);
   }
 }
+
+/// V2 Step 13: gamification tables, added to the sync at schema v6.
+const gamificationSyncedTables = [
+  'achievements',
+  'xp_log',
+];
+
+/// Same bookkeeping for the gamification tables (schema v6). Can be run
+/// more than once: it only adds what is missing.
+Future<void> applyGamificationSyncSchema(Database db) async {
+  await _ensureMetaTables(db);
+
+  for (final t in gamificationSyncedTables) {
+    final info = await db.rawQuery('PRAGMA table_info($t)');
+    final hasUpdatedAt = info.any((c) => c['name'] == 'updatedAt');
+    if (!hasUpdatedAt) {
+      await db.execute('ALTER TABLE $t ADD COLUMN updatedAt TEXT');
+    }
+    await _stampAndCreateTriggers(db, t);
+  }
+}

@@ -392,9 +392,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     final month = DateTime(_focusedDay.year, _focusedDay.month, 1);
     final current = _data;
     // Only use data that belongs to the month on screen.
-    final d = (current != null && current.focusedMonth == month)
-        ? current
-        : null;
+    final d =
+        (current != null && current.focusedMonth == month) ? current : null;
 
     final sessions = d?.sessionsByDay[_selectedDay] ?? const <StudySession>[];
     final exams = d?.examsByDay[_selectedDay] ?? const <Exam>[];
@@ -432,8 +431,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                     children: [
                       if (_error != null)
                         Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppSpacing.md),
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
                           child: Row(
                             children: [
                               Expanded(
@@ -477,8 +475,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                       ),
                       if (studied > 0)
                         Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppSpacing.sm),
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: Text(
                             'Studied ${formatDuration(studied)}',
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -513,7 +510,8 @@ class _CalendarScreenState extends State<CalendarScreen>
                                     'Unknown subject',
                           ),
                         for (var i = 0; i < sessions.length; i++)
-                          _sessionCard(d!, sessions[i], i == sessions.length - 1),
+                          _sessionCard(
+                              d!, sessions[i], i == sessions.length - 1),
                       ],
                     ],
                   ),

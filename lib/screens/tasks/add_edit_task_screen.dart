@@ -6,6 +6,7 @@ import '../../models/topic.dart';
 import '../../repositories/task_repository.dart';
 import '../../repositories/subject_repository.dart';
 import '../../repositories/topic_repository.dart';
+import '../../gamification/gamification_hooks.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/gradient_background.dart';
 import '../../widgets/app_buttons.dart';
@@ -133,6 +134,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     );
     if (confirmed != true) return;
     await _taskRepo.delete(widget.existing!.id);
+    await GamificationHooks.taskRemoved(widget.existing!.id);
     if (!mounted) return;
     Navigator.of(context).pop(true);
   }

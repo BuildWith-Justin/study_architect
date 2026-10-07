@@ -9,6 +9,7 @@ import '../../models/topic.dart';
 import '../../repositories/exam_repository.dart';
 import '../../repositories/subject_repository.dart';
 import '../../repositories/topic_repository.dart';
+import '../../gamification/gamification_hooks.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../utils/exam_format.dart';
@@ -110,6 +111,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
   Future<void> _setPrepared(ExamTopic link, bool value) async {
     try {
       await ExamRepository().setTopicPrepared(link.id, value);
+      if (value) {
+        await GamificationHooks.examTopicPrepared(link.id);
+      } else {
+        await GamificationHooks.examTopicUnprepared(link.id);
+      }
       DataRefreshBus.instance.notify(RefreshScope.exams);
       await _reload();
     } catch (_) {
@@ -156,6 +162,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
     if (confirmed != true) return;
 
     try {
+      await GamificationHooks.examRemoved(exam.id);
       await ExamRepository().delete(exam.id);
       DataRefreshBus.instance.notify(RefreshScope.exams);
       if (!mounted) return;

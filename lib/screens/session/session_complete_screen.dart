@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/data_refresh_bus.dart';
+import '../../gamification/gamification_engine.dart';
+import '../../gamification/xp_rules.dart';
 import '../../models/study_session.dart';
 import '../../repositories/session_repository.dart';
 import '../../theme/app_theme.dart';
@@ -57,6 +59,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen>
   late final List<_ConfettiPiece> _pieces;
 
   int? _rating;
+
+  /// XP, level-up and badges earned by this session (V2 step 13e).
+  AwardResult? _award;
   bool _saving = false;
   String? _error;
 
@@ -70,6 +75,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen>
 
     _notesController.text = widget.session.notes;
     _rating = widget.session.rating;
+    _award = GamificationEngine.instance.takeRecentAward(widget.session.id);
 
     final random = math.Random(7);
     const palette = [
@@ -185,6 +191,179 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen>
         ),
       ),
     );
+  }
+
+  /// A short note explaining why no XP was earned.
+  Widget _rewardNote(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: context.cardSurfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: context.secondaryText),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.secondaryText,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// XP, level-up and new badges earned by this session (V2 step 13e).
+  List<Widget> _rewardSection() {
+    final theme = Theme.of(context);
+    final award = _award;
+
+    // Nothing earned: say why, when there is a reason worth telling.
+    if (award == null || (award.xpAwarded == 0 && !award.dailyCapReached)) {
+      if (_focusedMinutes >= XpRules.minSessionMinutes) return const <Widget>[];
+      return [
+        const SizedBox(height: AppSpacing.lg),
+        _rewardNote(
+          'Sessions under ${XpRules.minSessionMinutes} minutes do not earn XP.',
+        ),
+      ];
+    }
+
+    if (award.xpAwarded == 0) {
+      return [
+        const SizedBox(height: AppSpacing.lg),
+        _rewardNote(
+          'Daily XP cap reached (${XpRules.dailySessionXpCap} XP from '
+          'sessions). Your study time still counts for your goals and streak.',
+        ),
+      ];
+    }
+
+    return [
+      const SizedBox(height: AppSpacing.lg),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.bolt_rounded, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  '+${award.xpAwarded} XP',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            if (award.streakBonus)
+              Text(
+                'Includes the +${XpRules.streakBonusPercent}% streak bonus',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: context.secondaryText,
+                ),
+              ),
+            if (award.dailyCapReached)
+              Text(
+                'Daily XP cap reached',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: context.secondaryText,
+                ),
+              ),
+            if (award.leveledUp) ...[
+              const SizedBox(height: AppSpacing.md),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.military_tech_rounded, color: Colors.white),
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(
+                      child: Text(
+                        'Level up! Level ${award.levelAfter} · '
+                        '${levelTitle(award.levelAfter)}',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (award.newBadges.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                award.newBadges.length == 1
+                    ? 'New badge unlocked'
+                    : 'New badges unlocked',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: context.secondaryText,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final b in award.newBadges)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: context.cardSurfaceAlt,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(b.icon, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            b.title,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: context.primaryText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    ];
   }
 
   Widget _moodPicker() {
@@ -324,6 +503,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen>
                       ),
                     ],
                   ),
+                  ..._rewardSection(),
                   const SizedBox(height: AppSpacing.xl),
                   Text(
                     'How did it feel?',

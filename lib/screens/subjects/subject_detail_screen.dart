@@ -9,6 +9,7 @@ import '../../models/study_session.dart';
 import '../../repositories/subject_repository.dart';
 import '../../repositories/topic_repository.dart';
 import '../../repositories/session_repository.dart';
+import '../../gamification/gamification_hooks.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../utils/date_utils.dart';
@@ -274,6 +275,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
     if (confirmed != true) return;
 
+    await GamificationHooks.topicRemoved(topic.id);
     await _topicRepo.delete(topic.id);
 
     if (!mounted) return;
@@ -365,6 +367,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
     if (confirmed != true) return;
 
+    await GamificationHooks.subjectRemoved(subject.id);
     await _subjectRepo.delete(subject.id);
 
     if (!context.mounted) return;

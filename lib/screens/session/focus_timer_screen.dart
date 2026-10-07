@@ -6,6 +6,7 @@ import '../../core/data_refresh_bus.dart';
 import '../../models/study_session.dart';
 import '../../repositories/session_repository.dart';
 import '../../services/notification_service.dart';
+import '../../gamification/gamification_hooks.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/date_utils.dart';
 import '../../widgets/app_buttons.dart';
@@ -261,6 +262,9 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
       await NotificationService.instance.cancelSessionReminder(
         updated.id,
       );
+
+      // V2 Step 13: award the XP before the next screen opens.
+      await GamificationHooks.sessionCompleted(updated);
 
       DataRefreshBus.instance.notify(RefreshScope.sessions);
 

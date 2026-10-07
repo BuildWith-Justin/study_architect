@@ -1,3 +1,4 @@
+import '../../gamification/gamification_engine.dart';
 import '../../models/student.dart';
 import '../../models/study_session.dart';
 import '../../models/subject.dart';
@@ -28,6 +29,10 @@ class HomeViewData {
   /// 7-day streak strip on Home (V2 step 6).
   final Set<String> completedDates;
 
+  /// V2 Step 13: level, XP and the streak (null if the engine failed, in
+  /// which case Home falls back to the old streak).
+  final GamificationSnapshot? gamification;
+
   const HomeViewData({
     required this.student,
     required this.todayMinutes,
@@ -41,6 +46,7 @@ class HomeViewData {
     required this.subjectsById,
     required this.todayTasks,
     this.completedDates = const <String>{},
+    this.gamification,
   });
 
   double get todayProgress => dailyGoalMinutes == 0
@@ -51,8 +57,20 @@ class HomeViewData {
       ? 0
       : ((weeklyMinutes / weeklyGoalMinutes) * 100).round();
 
-  /// True when [day] has at least one completed study session.
-  bool studiedOn(DateTime day) => completedDates.contains(_dateKey(day));
+  /// True when [day] counts for the streak (10+ minutes studied). Falls
+  /// back to "at least one completed session" if the engine failed.
+  bool studiedOn(DateTime day) {
+    final g = gamification;
+    if (g != null) return g.studyDays.contains(_dateKey(day));
+    return completedDates.contains(_dateKey(day));
+  }
+
+  /// True when the weekly freeze forgave the missed [day].
+  bool bridgedOn(DateTime day) =>
+      gamification?.streak.bridgedDays.contains(_dateKey(day)) ?? false;
+
+  /// True when this week's free missed day has already been used.
+  bool get freezeUsed => gamification?.streak.freezeUsedThisWeek ?? false;
 
   static String _dateKey(DateTime date) {
     final y = date.year.toString().padLeft(4, '0');
@@ -85,6 +103,15 @@ class HomeViewData {
     final todayTasks = await taskRepo.getForDate(now);
     final completedDates = await sessionRepo.getCompletedDates();
 
+    // V2 Step 13: level, XP and the new streak. If the engine fails, Home
+    // still loads.
+    GamificationSnapshot? gamification;
+    try {
+      gamification = await GamificationEngine.instance.getSnapshot(now: now);
+    } catch (_) {
+      gamification = null;
+    }
+
     return HomeViewData(
       student: student,
       todayMinutes: completedMinutesForDate(todaySessions, now),
@@ -93,11 +120,13 @@ class HomeViewData {
       weeklyGoalMinutes: student.weeklyGoalMinutes,
       subjectsCount: subjects.length,
       tasksTodayCount: todayTasks.where((t) => !t.completed).length,
-      streak: currentStreak(completedDates, today: now),
+      streak: gamification?.streak.length ??
+          currentStreak(completedDates, today: now),
       todaySessions: todaySessions,
       subjectsById: subjectsById,
       todayTasks: todayTasks,
       completedDates: completedDates,
+      gamification: gamification,
     );
   }
 }

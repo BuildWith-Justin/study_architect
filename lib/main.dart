@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app/app.dart';
 import 'features/auth/auth_service.dart';
 import 'services/notification_service.dart';
+import 'gamification/gamification_hooks.dart';
 import 'services/sync_service.dart';
 
 void main() async {
@@ -45,5 +46,9 @@ void main() async {
 
   // Safe no-op on Web — see notification_service.dart for why.
   await NotificationService.instance.init();
+
+  // V2 Step 13: gives XP to existing sessions and tasks the first time,
+  // then keeps the ledger in line with the data. Runs in the background.
+  GamificationHooks.startupRebuild();
   runApp(const StudyArchitectApp());
 }

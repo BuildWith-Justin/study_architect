@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../app/route_observer.dart';
 import '../../core/data_refresh_bus.dart';
 import '../../core/refreshable_screen.dart';
+import '../../gamification/gamification_engine.dart';
+import '../../gamification/xp_rules.dart';
 import '../../models/study_session.dart';
 import '../../models/subject.dart';
 import '../../theme/app_theme.dart';
@@ -12,6 +14,7 @@ import '../../widgets/pastel_card.dart';
 import '../../widgets/schedule_row.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/task_card.dart';
+import '../achievements/achievements_screen.dart';
 import '../progress/progress_screen.dart';
 import '../session/focus_timer_screen.dart';
 import '../tasks/add_edit_task_screen.dart';
@@ -184,7 +187,10 @@ class _HomeScreenState extends State<HomeScreen>
                   name: data.student.name,
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                const _LevelXpPlaceholderCard(),
+                GestureDetector(
+                  onTap: () => _openScreen(const AchievementsScreen()),
+                  child: _LevelXpCard(snapshot: data.gamification),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 _TodayProgressCard(
                   current: formatDuration(data.todayMinutes),
@@ -200,6 +206,9 @@ class _HomeScreenState extends State<HomeScreen>
                   weekDays: weekDays,
                   today: now,
                   studiedOn: data.studiedOn,
+                  bridgedOn: data.bridgedOn,
+                  bonusActive: data.streak >= XpRules.streakBonusMinStreak,
+                  freezeUsed: data.freezeUsed,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Row(
@@ -449,14 +458,36 @@ class _HomeHeader extends StatelessWidget {
   }
 }
 
-/// Placeholder for the level / XP header.
-/// TODO(step 13): show the real level and XP from the gamification engine.
-class _LevelXpPlaceholderCard extends StatelessWidget {
-  const _LevelXpPlaceholderCard();
+/// Level, XP progress and today's XP (V2 step 13d). Tappable: opens the
+/// Achievements screen, which the arrow on the right hints at.
+// 13e-chevron
+class _LevelXpCard extends StatelessWidget {
+  final GamificationSnapshot? snapshot;
+
+  const _LevelXpCard({required this.snapshot});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final snap = snapshot;
+    final level = snap?.level;
+
+    var title = 'Level & XP';
+    var xpText = '';
+    var detail = '';
+    if (snap != null && level != null) {
+      title = 'Level ${level.level} · ${levelTitle(level.level)}';
+      if (level.isMax) {
+        xpText = '${level.totalXp} XP';
+        detail = 'Max level reached';
+      } else {
+        xpText = '${level.xpIntoLevel} / ${level.levelSize} XP';
+        final today = snap.xpToday > 0
+            ? '+${snap.xpToday} XP today'
+            : 'Study to earn XP';
+        detail = '$today · ${level.xpToNext} XP to Level ${level.level + 1}';
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -469,14 +500,20 @@ class _LevelXpPlaceholderCard extends StatelessWidget {
           Container(
             width: 40,
             height: 40,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppColors.primary.withValues(alpha: 0.15),
             ),
-            child: const Icon(
-              Icons.bolt_rounded,
-              color: AppColors.primary,
-            ),
+            child: level == null
+                ? const Icon(Icons.bolt_rounded, color: AppColors.primary)
+                : Text(
+                    '${level.level}',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -486,14 +523,18 @@ class _LevelXpPlaceholderCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Level & XP',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        title,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.sm),
                     Text(
-                      'Coming soon',
+                      xpText,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: context.secondaryText,
                       ),
@@ -504,14 +545,28 @@ class _LevelXpPlaceholderCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: 0,
+                    value: level?.progress ?? 0,
                     minHeight: 6,
                     backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                     valueColor: const AlwaysStoppedAnimation(AppColors.primary),
                   ),
                 ),
+                if (detail.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    detail,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: context.secondaryText,
+                    ),
+                  ),
+                ],
               ],
             ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: context.secondaryText,
           ),
         ],
       ),
@@ -598,17 +653,25 @@ class _TodayProgressCard extends StatelessWidget {
 }
 
 /// Current streak plus the 7 days of this week (Monday to Sunday).
+/// A filled day has 10+ minutes studied; a snowflake is a missed day that
+/// the weekly freeze forgave.
 class _StreakStrip extends StatelessWidget {
   final int streak;
   final List<DateTime> weekDays;
   final DateTime today;
   final bool Function(DateTime day) studiedOn;
+  final bool Function(DateTime day) bridgedOn;
+  final bool bonusActive;
+  final bool freezeUsed;
 
   const _StreakStrip({
     required this.streak,
     required this.weekDays,
     required this.today,
     required this.studiedOn,
+    required this.bridgedOn,
+    required this.bonusActive,
+    required this.freezeUsed,
   });
 
   static const _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -640,12 +703,32 @@ class _StreakStrip extends StatelessWidget {
                 size: 22,
               ),
               const SizedBox(width: AppSpacing.sm),
-              Text(
-                title,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
+              if (bonusActive)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '+${XpRules.streakBonusPercent}% XP',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -653,6 +736,17 @@ class _StreakStrip extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(7, (i) => _dayCell(context, i)),
           ),
+          if (streak > 0) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              freezeUsed
+                  ? 'Missed-day freeze used this week'
+                  : 'One missed day per week is forgiven',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: context.secondaryText,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -661,6 +755,7 @@ class _StreakStrip extends StatelessWidget {
   Widget _dayCell(BuildContext context, int index) {
     final day = weekDays[index];
     final studied = studiedOn(day);
+    final bridged = !studied && bridgedOn(day);
     final isToday = isSameDay(day, today);
 
     final neutralFill = context.isDarkMode
@@ -689,7 +784,13 @@ class _StreakStrip extends StatelessWidget {
           ),
           child: studied
               ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
-              : null,
+              : bridged
+                  ? const Icon(
+                      Icons.ac_unit_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    )
+                  : null,
         ),
       ],
     );

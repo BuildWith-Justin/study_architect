@@ -8,6 +8,7 @@ import '../../models/topic.dart';
 import '../../repositories/exam_repository.dart';
 import '../../repositories/subject_repository.dart';
 import '../../repositories/topic_repository.dart';
+import '../../gamification/gamification_hooks.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../utils/exam_format.dart';
@@ -224,6 +225,11 @@ class _AddEditExamScreenState extends State<AddEditExamScreen> {
           ),
           topicIds: topicIds,
         );
+      }
+
+      // V2 Step 13: topics removed from the checklist lose their XP.
+      if (existing != null) {
+        await GamificationHooks.examTopicsEdited();
       }
 
       DataRefreshBus.instance.notify(RefreshScope.exams);

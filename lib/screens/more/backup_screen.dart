@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/startup_decider.dart';
+import '../../gamification/gamification_hooks.dart';
 import '../../services/backup_service.dart';
 import '../../services/database_service.dart';
 
@@ -118,6 +119,7 @@ class _BackupScreenState extends State<BackupScreen> {
       }
 
       await _backupService.restore(parsed);
+      await GamificationHooks.afterRestore();
 
       if (!mounted) return;
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/subject.dart';
 import '../../models/task.dart';
 import '../../repositories/task_repository.dart';
+import '../../gamification/gamification_hooks.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../utils/date_utils.dart';
@@ -75,6 +76,13 @@ class _TasksScreenState extends State<TasksScreen> {
     try {
       await _taskRepo.setCompleted(task.id, newValue);
       debugPrint('[Tasks] saved ${task.id}');
+
+      // V2 Step 13: XP for a completed task, removed again if un-ticked.
+      if (newValue) {
+        await GamificationHooks.taskCompleted(task.copyWith(completed: true));
+      } else {
+        await GamificationHooks.taskRemoved(task.id);
+      }
     } catch (e, st) {
       debugPrint('[Tasks] toggle failed: $e\n$st');
       if (!mounted) return;
