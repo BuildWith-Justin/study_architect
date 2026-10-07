@@ -9,6 +9,7 @@ import '../../models/subject.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../utils/date_utils.dart';
+import '../../widgets/ai_suggestion_card.dart';
 import '../../widgets/class_card.dart';
 import '../../widgets/pastel_card.dart';
 import '../../widgets/schedule_row.dart';
@@ -245,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 NextExamCard(loadToken: identityHashCode(data)),
-                const _AiSuggestionCard(),
+                AiSuggestionCard(loadToken: identityHashCode(data)),
                 const SizedBox(height: AppSpacing.lg),
                 if (_currentOrNextSession(data) != null) ...[
                   _buildClassCard(data),
@@ -793,68 +794,6 @@ class _StreakStrip extends StatelessWidget {
                   : null,
         ),
       ],
-    );
-  }
-}
-
-/// Placeholder slot for the AI study suggestion.
-/// TODO(step 14): fill with pattern-based suggestions.
-class _AiSuggestionCard extends StatelessWidget {
-  const _AiSuggestionCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: context.cardSurfaceAlt,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.25),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.teal.withValues(alpha: 0.18),
-            ),
-            child: const Icon(
-              Icons.auto_awesome_rounded,
-              color: AppColors.primary,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Study suggestion',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Personalised tips based on your study habits will appear here.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: context.secondaryText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
