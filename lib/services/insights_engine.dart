@@ -43,6 +43,7 @@ class InsightsEngine {
     DateTime? now,
   }) {
     final today = now ?? DateTime.now();
+    // ignore: unused_local_variable
     final todayStart = startOfDay(today);
 
     final done = sessions

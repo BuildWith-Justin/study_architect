@@ -8,7 +8,7 @@ import '../../theme/theme_helpers.dart';
 import '../../utils/date_utils.dart';
 import '../../widgets/async_builder.dart';
 import '../../widgets/gradient_background.dart';
-import '../../widgets/insight_carousel.dart';
+import '../../widgets/ai_insights_section.dart';
 import '../../widgets/study_bar_chart.dart';
 import 'progress_view_data.dart';
 import 'weekly_report_screen.dart';
@@ -232,18 +232,7 @@ class _ProgressScreenState extends State<ProgressScreen>
                                     const SizedBox(height: AppSpacing.lg),
                                   ],
                                   _StreakCard(data: data),
-                                  if (data.insights.isNotEmpty) ...[
-                                    const SizedBox(height: AppSpacing.lg),
-                                    Text(
-                                      'Insights',
-                                      style:
-                                          theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSpacing.sm),
-                                    InsightCarousel(insights: data.insights),
-                                  ],
+                                  AiInsightsSection(loadToken: identityHashCode(data)),
                                 ],
                               ),
                             );

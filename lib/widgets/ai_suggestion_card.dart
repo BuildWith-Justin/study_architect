@@ -6,11 +6,13 @@ import '../screens/tasks/tasks_screen.dart';
 import '../services/insights_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_helpers.dart';
+import 'quick_add_sheet.dart';
 
 /// V2 Step 14: the "Study suggestion" card on Home.
 ///
-/// Shows the most important pattern-based insight. Pass a [loadToken]
-/// that changes every time Home reloads (Home uses
+/// Shows the most important pattern-based insight, plus a "Quick add"
+/// link that opens the natural-language quick-add sheet. Pass a
+/// [loadToken] that changes every time Home reloads (Home uses
 /// identityHashCode(data)), so the card refreshes together with Home.
 class AiSuggestionCard extends StatefulWidget {
   final int loadToken;
@@ -57,6 +59,11 @@ class _AiSuggestionCardState extends State<AiSuggestionCard> {
     if (_insights.isEmpty) return;
     await InsightsService.snooze(_insights[_index]);
     await _reload();
+  }
+
+  Future<void> _openQuickAdd() async {
+    final created = await showQuickAddSheet(context);
+    if (created && mounted) await _reload();
   }
 
   Future<void> _runAction(Insight insight) async {
@@ -208,6 +215,29 @@ class _AiSuggestionCardState extends State<AiSuggestionCard> {
                     ],
                   ),
                 ],
+                const SizedBox(height: AppSpacing.sm),
+                GestureDetector(
+                  onTap: _openQuickAdd,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.add_circle_outline_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Quick add a session or task',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
