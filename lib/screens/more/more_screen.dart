@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../utils/date_utils.dart';
 import '../../widgets/async_builder.dart';
+import '../../widgets/user_avatar.dart';
 import '../../features/auth/auth_service.dart';
 import '../../features/auth/password_prompt_card.dart';
 import '../../features/auth/set_password_screen.dart';
@@ -233,19 +234,10 @@ class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
                 },
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: AppColors.accentPurpleStrong,
-                      child: Text(
-                        student.name.isNotEmpty
-                            ? student.name[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 18,
-                        ),
-                      ),
+                    UserAvatar(
+                      name: student.name,
+                      avatarPath: student.avatarPath,
+                      size: 48,
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(

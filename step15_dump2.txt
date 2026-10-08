@@ -1,0 +1,1129 @@
+STEP 15 DUMP 2
+
+===== lib\services\database_service.dart =====
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+import 'sync_schema.dart';
+
+/// Owns the single sqflite Database instance and schema. Screens never
+/// touch this directly — they go through the repositories in
+/// lib/repositories/, which call DatabaseService.instance.database.
+class DatabaseService {
+  DatabaseService._internal();
+  static final DatabaseService instance = DatabaseService._internal();
+
+  static const _dbName = 'study_architect.db';
+  static const _dbVersion = 6;
+
+  Database? _db;
+
+  Future<Database> get database async {
+    _db ??= await _open();
+    return _db!;
+  }
+
+  Future<Database> _open() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, _dbName);
+    return openDatabase(
+      path,
+      version: _dbVersion,
+      onCreate: (db, version) async {
+        await _createSchema(db, version);
+        await applySyncSchema(db);
+        await _addExams(db);
+        await _addGamification(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await applySyncSchema(db);
+        if (oldVersion < 3) await _addSessionRecurrence(db);
+        if (oldVersion < 4) await _addTopicSortOrder(db);
+        if (oldVersion < 5) await _addExams(db);
+        if (oldVersion < 6) await _addGamification(db);
+      },
+      // sqflite does not enforce foreign keys by default — turn them on
+      // so the ON DELETE CASCADE / SET NULL rules above actually run.
+      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+    );
+  }
+
+  /// V2 Step 7: recurring sessions. Every weekly occurrence is stored as
+  /// its own row; these columns link the rows of one series together.
+  Future<void> _addSessionRecurrence(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(study_sessions)');
+    final existing = info.map((c) => c['name'] as String).toSet();
+    if (!existing.contains('recurrence')) {
+      await db.execute(
+        "ALTER TABLE study_sessions ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'",
+      );
+    }
+    if (!existing.contains('recurrenceUntil')) {
+      await db.execute(
+        'ALTER TABLE study_sessions ADD COLUMN recurrenceUntil TEXT',
+      );
+    }
+    if (!existing.contains('seriesId')) {
+      await db.execute('ALTER TABLE study_sessions ADD COLUMN seriesId TEXT');
+    }
+  }
+
+  /// V2 Step 9: ordered study roadmap. Adds topics.sortOrder and gives
+  /// every existing topic a position that keeps the order it was created
+  /// in (per subject). The update triggers stamp updatedAt, so the new
+  /// positions upload to the cloud on the next sync.
+  Future<void> _addTopicSortOrder(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(topics)');
+    final existing = info.map((c) => c['name'] as String).toSet();
+    if (existing.contains('sortOrder')) return;
+
+    await db.execute(
+      'ALTER TABLE topics ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute('''
+      UPDATE topics
+      SET sortOrder = (
+        SELECT COUNT(*) FROM topics t2
+        WHERE t2.subjectId = topics.subjectId AND t2.rowid < topics.rowid
+      )
+    ''');
+  }
+
+  /// V2 Step 11: exam mode. An exam belongs to a subject; exam_topics is
+  /// its preparation checklist (which topics, and whether each one is
+  /// prepared). Both tables are synced to the cloud.
+  Future<void> _addExams(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exams (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        title TEXT NOT NULL,
+        examDate TEXT NOT NULL,
+        location TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exam_topics (
+        id TEXT PRIMARY KEY,
+        examId TEXT NOT NULL,
+        topicId TEXT NOT NULL,
+        prepared INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (examId, topicId),
+        FOREIGN KEY (examId) REFERENCES exams (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_exams_date ON exams (examDate)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_exam_topics_exam ON exam_topics (examId)',
+    );
+
+    await applyExamSyncSchema(db);
+  }
+
+  /// V2 Step 13: gamification. xp_log is the append-only ledger of every
+  /// XP award (one row per source, so the same session or task can never
+  /// pay twice); achievements holds the badges already unlocked. Both
+  /// tables are synced to the cloud. Level, streak bonus and progress are
+  /// always computed from these rows, never stored.
+  Future<void> _addGamification(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS xp_log (
+        id TEXT PRIMARY KEY,
+        sourceType TEXT NOT NULL,
+        sourceId TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        reason TEXT NOT NULL DEFAULT '',
+        earnedAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS achievements (
+        id TEXT PRIMARY KEY,
+        unlockedAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_xp_log_source ON xp_log (sourceType, sourceId)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_xp_log_earned ON xp_log (earnedAt)',
+    );
+
+    await applyGamificationSyncSchema(db);
+  }
+
+  Future<void> _createSchema(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE students (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        school TEXT NOT NULL,
+        program TEXT NOT NULL,
+        level TEXT NOT NULL,
+        dailyGoalMinutes INTEGER NOT NULL,
+        weeklyGoalMinutes INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE subjects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        difficulty TEXT NOT NULL,
+        colorValue INTEGER NOT NULL,
+        weeklyTargetMinutes INTEGER NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE topics (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE study_sessions (
+        id TEXT PRIMARY KEY,
+        subjectId TEXT NOT NULL,
+        topicId TEXT,
+        scheduledDate TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT NOT NULL,
+        actualDuration INTEGER,
+        status TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        rating INTEGER,
+        complete INTEGER NOT NULL DEFAULT 0,
+        recurrence TEXT NOT NULL DEFAULT 'none',
+        recurrenceUntil TEXT,
+        seriesId TEXT,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        subjectId TEXT NOT NULL,
+        topicId TEXT,
+        dueDate TEXT NOT NULL,
+        type TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        completed INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (subjectId) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (topicId) REFERENCES topics (id) ON DELETE SET NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE settings (
+        id INTEGER PRIMARY KEY CHECK (id = 0),
+        notificationsEnabled INTEGER NOT NULL DEFAULT 1,
+        themeMode TEXT NOT NULL DEFAULT 'system'
+      )
+    ''');
+  }
+
+  /// Wipes every table but keeps the schema — used by the
+  /// "Clear All Data" danger-zone action in Step 14.
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('xp_log');
+    await db.delete('achievements');
+    await db.delete('exam_topics');
+    await db.delete('exams');
+    await db.delete('tasks');
+    await db.delete('study_sessions');
+    await db.delete('topics');
+    await db.delete('subjects');
+    await db.delete('students');
+    await db.delete('settings');
+  }
+
+  /// Full replace restore from a parsed backup JSON (see
+  /// BackupService for the schema). Deletes everything currently
+  /// stored, then inserts every row from the backup directly —
+  /// bypassing repository-level validation (e.g. StudySession's
+  /// end-after-start check) since this is trusted historical data
+  /// that was valid when it was first saved.
+  Future<void> restoreFromBackup({
+    Map<String, dynamic>? student,
+    Map<String, dynamic>? settings,
+    required List<Map<String, dynamic>> subjects,
+    required List<Map<String, dynamic>> topics,
+    required List<Map<String, dynamic>> sessions,
+    required List<Map<String, dynamic>> tasks,
+    List<Map<String, dynamic>> exams = const [],
+    List<Map<String, dynamic>> examTopics = const [],
+    List<Map<String, dynamic>> xpLog = const [],
+    List<Map<String, dynamic>> achievements = const [],
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('xp_log');
+      await txn.delete('achievements');
+      await txn.delete('exam_topics');
+      await txn.delete('exams');
+      await txn.delete('tasks');
+      await txn.delete('study_sessions');
+      await txn.delete('topics');
+      await txn.delete('subjects');
+      await txn.delete('students');
+      await txn.delete('settings');
+
+      if (student != null) {
+        await txn.insert('students', student);
+      }
+      if (settings != null) {
+        await txn.insert('settings', {...settings, 'id': 0});
+      }
+      for (final row in subjects) {
+        await txn.insert('subjects', row);
+      }
+      for (final row in topics) {
+        await txn.insert('topics', row);
+      }
+      for (final row in sessions) {
+        await txn.insert('study_sessions', row);
+      }
+      for (final row in tasks) {
+        await txn.insert('tasks', row);
+      }
+      for (final row in exams) {
+        await txn.insert('exams', row);
+      }
+      for (final row in examTopics) {
+        await txn.insert('exam_topics', row);
+      }
+      for (final row in xpLog) {
+        await txn.insert('xp_log', row);
+      }
+      for (final row in achievements) {
+        await txn.insert('achievements', row);
+      }
+    });
+  }
+}
+
+
+===== lib\services\sync_schema.dart =====
+import 'package:sqflite/sqflite.dart';
+
+/// Tables that are mirrored to Supabase (the original set, schema v2).
+const syncedTables = [
+  'students',
+  'settings',
+  'subjects',
+  'topics',
+  'study_sessions',
+  'tasks',
+];
+
+/// V2 Step 11: exam tables, added to the sync at schema v5. They have
+/// their own function below because their tables are created later than
+/// the original ones.
+const examSyncedTables = [
+  'exams',
+  'exam_topics',
+];
+
+// SQLite expression for "now" in the same format Dart's toIso8601String()
+// produces (UTC, millisecond precision) so strings compare correctly.
+const _now = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
+
+Future<void> _ensureMetaTables(Database db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS sync_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  ''');
+
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS sync_tombstones (
+      tableName TEXT NOT NULL,
+      rowId TEXT NOT NULL,
+      deletedAt TEXT NOT NULL,
+      PRIMARY KEY (tableName, rowId)
+    )
+  ''');
+}
+
+/// Stamps existing rows and creates the three bookkeeping triggers for
+/// one table. Safe to run twice (IF NOT EXISTS).
+Future<void> _stampAndCreateTriggers(Database db, String t) async {
+  // Existing rows get a timestamp so they upload on the first sync.
+  await db.execute('UPDATE $t SET updatedAt = $_now WHERE updatedAt IS NULL');
+
+  // New row: stamp it, and cancel any pending delete for the same id
+  // (happens when a backup restore re-inserts a row).
+  await db.execute('''
+    CREATE TRIGGER IF NOT EXISTS trg_${t}_ai AFTER INSERT ON $t
+    BEGIN
+      DELETE FROM sync_tombstones
+        WHERE tableName = '$t' AND rowId = CAST(NEW.id AS TEXT);
+      UPDATE $t SET updatedAt = $_now
+        WHERE rowid = NEW.rowid AND updatedAt IS NULL;
+    END
+  ''');
+
+  // Edited row: repositories never set updatedAt, so it is unchanged
+  // here and we stamp it. Rows written by the sync itself carry a
+  // different updatedAt, so they are left alone.
+  await db.execute('''
+    CREATE TRIGGER IF NOT EXISTS trg_${t}_au AFTER UPDATE ON $t
+    WHEN NEW.updatedAt IS OLD.updatedAt
+    BEGIN
+      UPDATE $t SET updatedAt = $_now WHERE rowid = NEW.rowid;
+    END
+  ''');
+
+  // Deleted row: remember it so the delete can be sent to the cloud.
+  await db.execute('''
+    CREATE TRIGGER IF NOT EXISTS trg_${t}_ad AFTER DELETE ON $t
+    BEGIN
+      INSERT OR REPLACE INTO sync_tombstones (tableName, rowId, deletedAt)
+      VALUES ('$t', CAST(OLD.id AS TEXT), $_now);
+    END
+  ''');
+}
+
+/// Adds sync bookkeeping to the local database (schema v2).
+/// - updatedAt column on every synced table
+/// - triggers that stamp updatedAt on insert/update
+/// - triggers that record deletes in sync_tombstones
+Future<void> applySyncSchema(Database db) async {
+  await _ensureMetaTables(db);
+
+  for (final t in syncedTables) {
+    await db.execute('ALTER TABLE $t ADD COLUMN updatedAt TEXT');
+    await _stampAndCreateTriggers(db, t);
+  }
+}
+
+/// Same bookkeeping for the exam tables (schema v5). Can be run more than
+/// once: it only adds what is missing.
+Future<void> applyExamSyncSchema(Database db) async {
+  await _ensureMetaTables(db);
+
+  for (final t in examSyncedTables) {
+    final info = await db.rawQuery('PRAGMA table_info($t)');
+    final hasUpdatedAt = info.any((c) => c['name'] == 'updatedAt');
+    if (!hasUpdatedAt) {
+      await db.execute('ALTER TABLE $t ADD COLUMN updatedAt TEXT');
+    }
+    await _stampAndCreateTriggers(db, t);
+  }
+}
+
+/// V2 Step 13: gamification tables, added to the sync at schema v6.
+const gamificationSyncedTables = [
+  'achievements',
+  'xp_log',
+];
+
+/// Same bookkeeping for the gamification tables (schema v6). Can be run
+/// more than once: it only adds what is missing.
+Future<void> applyGamificationSyncSchema(Database db) async {
+  await _ensureMetaTables(db);
+
+  for (final t in gamificationSyncedTables) {
+    final info = await db.rawQuery('PRAGMA table_info($t)');
+    final hasUpdatedAt = info.any((c) => c['name'] == 'updatedAt');
+    if (!hasUpdatedAt) {
+      await db.execute('ALTER TABLE $t ADD COLUMN updatedAt TEXT');
+    }
+    await _stampAndCreateTriggers(db, t);
+  }
+}
+
+
+===== lib\services\backup_service.dart =====
+import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../repositories/achievement_repository.dart';
+import '../repositories/exam_repository.dart';
+import '../repositories/session_repository.dart';
+import '../repositories/settings_repository.dart';
+import '../repositories/student_repository.dart';
+import '../repositories/subject_repository.dart';
+import '../repositories/task_repository.dart';
+import '../repositories/topic_repository.dart';
+import '../repositories/xp_repository.dart';
+import 'database_service.dart';
+
+/// The export/import format is just each model's existing toMap()
+/// shape (the same one the repositories use for sqflite), wrapped
+/// with a version tag — Step 3 built the models with this reuse in
+/// mind from the start.
+class BackupService {
+  static const _currentVersion = 1;
+
+  /// Gathers every table into one JSON-serializable map.
+  Future<Map<String, dynamic>> buildBackupJson() async {
+    final student = await StudentRepository().getCurrent();
+    final settings = await SettingsRepository().get();
+    final subjects = await SubjectRepository().getAll();
+
+    final topics = <Map<String, dynamic>>[];
+    final sessions = <Map<String, dynamic>>[];
+    for (final subject in subjects) {
+      final subjectTopics = await TopicRepository().getForSubject(subject.id);
+      topics.addAll(subjectTopics.map((t) => t.toMap()));
+      final subjectSessions =
+          await SessionRepository().getForSubject(subject.id);
+      sessions.addAll(subjectSessions.map((s) => s.toMap()));
+    }
+
+    final tasks = await TaskRepository().getAll();
+
+    // V2 Step 11: exams and their topic checklists. Older backups simply
+    // do not have these two keys.
+    final examRepo = ExamRepository();
+    final exams = await examRepo.getAll();
+    final examTopics = await examRepo.getAllTopicLinks();
+
+    // V2 Step 13: XP ledger and unlocked badges. Older backups simply do
+    // not have these two keys.
+    final xpLog = await XpRepository().getAll();
+    final achievements = await AchievementRepository().getAll();
+
+    return {
+      'version': _currentVersion,
+      'exportedAt': DateTime.now().toIso8601String(),
+      'student': student?.toMap(),
+      'settings': settings.toMap(),
+      'subjects': subjects.map((s) => s.toMap()).toList(),
+      'topics': topics,
+      'sessions': sessions,
+      'tasks': tasks.map((t) => t.toMap()).toList(),
+      'exams': exams.map((e) => e.toMap()).toList(),
+      'examTopics': examTopics.map((l) => l.toMap()).toList(),
+      'xpLog': xpLog.map((x) => x.toMap()).toList(),
+      'achievements': achievements.map((a) => a.toMap()).toList(),
+    };
+  }
+
+  /// Writes the backup JSON to a temp file and returns its path, so
+  /// callers can share it or otherwise hand it off to the OS.
+  Future<String> exportToFile() async {
+    final json = await buildBackupJson();
+    final dir = await getTemporaryDirectory();
+    final timestamp =
+        DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
+    final file = File('${dir.path}/study_architect_backup_$timestamp.json');
+    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(json));
+    return file.path;
+  }
+
+  /// Writes the backup and opens the OS share sheet so the person can
+  /// save it to Drive, Files, email it to themselves, etc. — there's
+  /// no "export folder" concept needed since the share sheet handles
+  /// wherever they actually want to put it.
+  Future<void> shareBackup() async {
+    final path = await exportToFile();
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(path)], text: 'Study Architect backup'),
+    );
+  }
+
+  /// Validates and parses backup JSON text. Throws FormatException
+  /// with a human-readable message if it doesn't look like a Study
+  /// Architect backup.
+  Map<String, dynamic> parseBackup(String jsonText) {
+    final decoded = jsonDecode(jsonText);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException(
+          'This file is not a valid Study Architect backup.');
+    }
+    if (decoded['version'] == null) {
+      throw const FormatException('This file is missing a version marker.');
+    }
+    if (decoded['version'] > _currentVersion) {
+      throw const FormatException(
+          'This backup was made by a newer version of the app.');
+    }
+    return decoded;
+  }
+
+  /// Fully replaces local data with the contents of [backup].
+  Future<void> restore(Map<String, dynamic> backup) async {
+    await DatabaseService.instance.restoreFromBackup(
+      student: (backup['student'] as Map?)?.cast<String, dynamic>(),
+      settings: (backup['settings'] as Map?)?.cast<String, dynamic>(),
+      subjects: _asMapList(backup['subjects']),
+      topics: _asMapList(backup['topics']),
+      sessions: _asMapList(backup['sessions']),
+      tasks: _asMapList(backup['tasks']),
+      exams: _asMapList(backup['exams']),
+      examTopics: _asMapList(backup['examTopics']),
+      xpLog: _asMapList(backup['xpLog']),
+      achievements: _asMapList(backup['achievements']),
+    );
+  }
+
+  List<Map<String, dynamic>> _asMapList(dynamic value) {
+    if (value is! List) return [];
+    return value.map((e) => (e as Map).cast<String, dynamic>()).toList();
+  }
+}
+
+
+===== lib\core\data_refresh_bus.dart =====
+import 'dart:async';
+
+enum RefreshScope {
+  subjects,
+  sessions,
+  tasks,
+  exams,
+  achievements,
+  all,
+}
+
+class DataRefreshBus {
+  DataRefreshBus._internal();
+  static final DataRefreshBus instance = DataRefreshBus._internal();
+
+  final StreamController<RefreshScope> _controller =
+      StreamController<RefreshScope>.broadcast();
+
+  Stream<RefreshScope> get stream => _controller.stream;
+
+  void notify(RefreshScope scope) {
+    _controller.add(scope);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+
+===== lib\screens\home\home_view_data.dart =====
+import '../../gamification/gamification_engine.dart';
+import '../../models/student.dart';
+import '../../models/study_session.dart';
+import '../../models/subject.dart';
+import '../../models/task.dart';
+import '../../repositories/session_repository.dart';
+import '../../repositories/student_repository.dart';
+import '../../repositories/subject_repository.dart';
+import '../../repositories/task_repository.dart';
+import '../../utils/date_utils.dart';
+import '../../utils/study_stats.dart';
+
+/// Everything the Home screen needs, loaded in one pass so the UI
+/// never has to juggle five separate FutureBuilders.
+class HomeViewData {
+  final Student student;
+  final int todayMinutes;
+  final int dailyGoalMinutes;
+  final int weeklyMinutes;
+  final int weeklyGoalMinutes;
+  final int subjectsCount;
+  final int tasksTodayCount;
+  final int streak;
+  final List<StudySession> todaySessions;
+  final Map<String, Subject> subjectsById;
+  final List<Task> todayTasks;
+
+  /// Days (yyyy-MM-dd) with at least one completed session. Powers the
+  /// 7-day streak strip on Home (V2 step 6).
+  final Set<String> completedDates;
+
+  /// V2 Step 13: level, XP and the streak (null if the engine failed, in
+  /// which case Home falls back to the old streak).
+  final GamificationSnapshot? gamification;
+
+  const HomeViewData({
+    required this.student,
+    required this.todayMinutes,
+    required this.dailyGoalMinutes,
+    required this.weeklyMinutes,
+    required this.weeklyGoalMinutes,
+    required this.subjectsCount,
+    required this.tasksTodayCount,
+    required this.streak,
+    required this.todaySessions,
+    required this.subjectsById,
+    required this.todayTasks,
+    this.completedDates = const <String>{},
+    this.gamification,
+  });
+
+  double get todayProgress => dailyGoalMinutes == 0
+      ? 0
+      : (todayMinutes / dailyGoalMinutes).clamp(0.0, 1.0);
+
+  int get weeklyGoalPercent => weeklyGoalMinutes == 0
+      ? 0
+      : ((weeklyMinutes / weeklyGoalMinutes) * 100).round();
+
+  /// True when [day] counts for the streak (10+ minutes studied). Falls
+  /// back to "at least one completed session" if the engine failed.
+  bool studiedOn(DateTime day) {
+    final g = gamification;
+    if (g != null) return g.studyDays.contains(_dateKey(day));
+    return completedDates.contains(_dateKey(day));
+  }
+
+  /// True when the weekly freeze forgave the missed [day].
+  bool bridgedOn(DateTime day) =>
+      gamification?.streak.bridgedDays.contains(_dateKey(day)) ?? false;
+
+  /// True when this week's free missed day has already been used.
+  bool get freezeUsed => gamification?.streak.freezeUsedThisWeek ?? false;
+
+  static String _dateKey(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  static Future<HomeViewData> load() async {
+    final studentRepo = StudentRepository();
+    final subjectRepo = SubjectRepository();
+    final sessionRepo = SessionRepository();
+    final taskRepo = TaskRepository();
+
+    final now = DateTime.now();
+    final weekStart = startOfWeek(now);
+    final weekEnd = endOfWeek(now);
+
+    final student = await studentRepo.getCurrent();
+    if (student == null) {
+      throw StateError(
+          'HomeViewData.load() called before onboarding completed.');
+    }
+
+    final subjects = await subjectRepo.getAll();
+    final subjectsById = {for (final s in subjects) s.id: s};
+
+    final todaySessions = await sessionRepo.getForDate(now);
+    final weekSessions = await sessionRepo.getForRange(weekStart, weekEnd);
+    final todayTasks = await taskRepo.getForDate(now);
+    final completedDates = await sessionRepo.getCompletedDates();
+
+    // V2 Step 13: level, XP and the new streak. If the engine fails, Home
+    // still loads.
+    GamificationSnapshot? gamification;
+    try {
+      gamification = await GamificationEngine.instance.getSnapshot(now: now);
+    } catch (_) {
+      gamification = null;
+    }
+
+    return HomeViewData(
+      student: student,
+      todayMinutes: completedMinutesForDate(todaySessions, now),
+      dailyGoalMinutes: student.dailyGoalMinutes,
+      weeklyMinutes: completedMinutesTotal(weekSessions),
+      weeklyGoalMinutes: student.weeklyGoalMinutes,
+      subjectsCount: subjects.length,
+      tasksTodayCount: todayTasks.where((t) => !t.completed).length,
+      streak: gamification?.streak.length ??
+          currentStreak(completedDates, today: now),
+      todaySessions: todaySessions,
+      subjectsById: subjectsById,
+      todayTasks: todayTasks,
+      completedDates: completedDates,
+      gamification: gamification,
+    );
+  }
+}
+
+
+===== lib\screens\more\more_view_data.dart =====
+import '../../models/settings.dart';
+import '../../models/student.dart';
+import '../../repositories/settings_repository.dart';
+import '../../repositories/student_repository.dart';
+
+class MoreViewData {
+  final Student student;
+  final AppSettings settings;
+
+  const MoreViewData({required this.student, required this.settings});
+
+  static Future<MoreViewData> load() async {
+    final student = await StudentRepository().getCurrent();
+    final settings = await SettingsRepository().get();
+    if (student == null) {
+      throw StateError(
+          'MoreViewData.load() called before onboarding completed.');
+    }
+    return MoreViewData(student: student, settings: settings);
+  }
+}
+
+
+===== lib\screens\onboarding\onboarding_flow.dart =====
+import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../features/auth/auth_service.dart';
+import '../../models/student.dart';
+import '../../models/subject.dart';
+import '../../repositories/student_repository.dart';
+import '../../repositories/subject_repository.dart';
+import '../../services/notification_service.dart';
+import '../../services/sync_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/gradient_background.dart';
+import 'goal_dial_screen.dart';
+import 'profile_setup_screen.dart';
+import 'subjects_setup_screen.dart';
+import 'welcome_screen.dart';
+
+/// Drives welcome -> profile -> daily goal (dial) -> subjects, then saves a
+/// Student and its Subjects locally. SyncService uploads them to Supabase
+/// (the database triggers stamp updatedAt), so there is no cloud code here.
+class OnboardingFlow extends StatefulWidget {
+  final VoidCallback onComplete;
+
+  const OnboardingFlow({
+    super.key,
+    required this.onComplete,
+  });
+
+  @override
+  State<OnboardingFlow> createState() => _OnboardingFlowState();
+}
+
+class _OnboardingFlowState extends State<OnboardingFlow> {
+  static const _pageCount = 4;
+
+  final _pageController = PageController();
+  final _studentRepository = StudentRepository();
+  final _subjectRepository = SubjectRepository();
+  final _uuid = const Uuid();
+
+  int _page = 0;
+
+  String _name = '';
+  String _school = '';
+  String _program = '';
+  String _level = '';
+  int _dailyGoalMinutes = 180;
+
+  bool _saving = false;
+  String? _error;
+
+  // Kept across retries so a failed attempt never creates duplicates.
+  String? _studentId;
+  bool _studentSaved = false;
+  final Set<String> _savedSubjectIds = {};
+
+  void _goTo(int page) {
+    if (_saving) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _page = page);
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _next() => _goTo(_page + 1);
+
+  Future<void> _finish(List<SubjectDraft> drafts) async {
+    if (_saving) return;
+
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      _studentId ??= _uuid.v4();
+
+      final student = Student(
+        id: _studentId!,
+        name: _name.trim(),
+        school: _school.trim(),
+        program: _program.trim(),
+        level: _level.trim(),
+        dailyGoalMinutes: _dailyGoalMinutes,
+        // Weekly goal follows the daily goal until the user changes it
+        // from More/Settings.
+        weeklyGoalMinutes: _dailyGoalMinutes * 7,
+      );
+
+      if (_studentSaved) {
+        await _studentRepository.update(student);
+      } else {
+        await _studentRepository.save(student);
+        _studentSaved = true;
+      }
+
+      final now = DateTime.now();
+      for (final d in drafts) {
+        if (_savedSubjectIds.contains(d.id)) continue;
+
+        await _subjectRepository.create(
+          Subject(
+            id: d.id,
+            name: d.name.trim(),
+            difficulty: d.difficulty,
+            colorValue: d.colorValue,
+            weeklyTargetMinutes: d.weeklyTargetHours * 60,
+            createdAt: now,
+          ),
+        );
+        _savedSubjectIds.add(d.id);
+      }
+
+      // Notification setup should not prevent onboarding from
+      // completing if the platform rejects permission or scheduling.
+      try {
+        await NotificationService.instance.requestPermissions();
+
+        await NotificationService.instance.scheduleDailyGoalReminder(
+          const TimeOfDay(hour: 19, minute: 0),
+        );
+      } catch (e, stackTrace) {
+        debugPrint(
+          'Onboarding notification setup failed: $e\n$stackTrace',
+        );
+      }
+
+      // Ask the sync layer to upload the new rows soon.
+      if (AuthService.isAvailable) {
+        SyncService.instance.scheduleSync();
+      }
+
+      if (!mounted) return;
+
+      setState(() => _saving = false);
+
+      widget.onComplete();
+    } catch (e, stackTrace) {
+      debugPrint('Onboarding save failed: $e\n$stackTrace');
+
+      if (!mounted) return;
+
+      setState(() {
+        _saving = false;
+        _error = 'Could not finish setup. Please try again.';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return PopScope(
+      canPop: _page == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _page > 0) _goTo(_page - 1);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: GradientBackground(
+          child: SafeArea(
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.sm,
+                        AppSpacing.sm,
+                        AppSpacing.xl,
+                        0,
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 48,
+                            child: _page > 0
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.arrow_back_rounded,
+                                      color: onSurface,
+                                    ),
+                                    onPressed: () => _goTo(_page - 1),
+                                  )
+                                : null,
+                          ),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (var i = 0; i < _pageCount; i++)
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 250),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    width: i == _page ? 26 : 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: i <= _page
+                                          ? AppColors.primary
+                                          : onSurface.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 48),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: PageView(
+                        controller: _pageController,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          _KeepAlive(
+                            child: WelcomeScreen(
+                              onGetStarted: _next,
+                              onImportExisting: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Import will be available from '
+                                      'Backup & Restore.',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          _KeepAlive(
+                            child: ProfileSetupScreen(
+                              onContinue: (name, school, program, level) {
+                                _name = name;
+                                _school = school;
+                                _program = program;
+                                _level = level;
+                                _next();
+                              },
+                            ),
+                          ),
+                          _KeepAlive(
+                            child: GoalDialScreen(
+                              initialMinutes: _dailyGoalMinutes,
+                              onContinue: (minutes) {
+                                _dailyGoalMinutes = minutes;
+                                _next();
+                              },
+                            ),
+                          ),
+                          _KeepAlive(
+                            child: SubjectsSetupScreen(onFinish: _finish),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (_error != null)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: Material(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: Colors.redAccent,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(_error!)),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _error = null;
+                                });
+                              },
+                              child: const Text('Dismiss'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_saving)
+                  Positioned.fill(
+                    child: AbsorbPointer(
+                      child: Container(
+                        color: Colors.black26,
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Keeps each page alive so typed text and added subjects survive when
+/// the user goes back and forward.
+class _KeepAlive extends StatefulWidget {
+  final Widget child;
+  const _KeepAlive({required this.child});
+
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+

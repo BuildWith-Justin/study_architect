@@ -11,7 +11,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'study_architect.db';
-  static const _dbVersion = 6;
+  static const _dbVersion = 7;
 
   Database? _db;
 
@@ -31,6 +31,7 @@ class DatabaseService {
         await applySyncSchema(db);
         await _addExams(db);
         await _addGamification(db);
+        await _addAvatarPath(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await applySyncSchema(db);
@@ -38,6 +39,7 @@ class DatabaseService {
         if (oldVersion < 4) await _addTopicSortOrder(db);
         if (oldVersion < 5) await _addExams(db);
         if (oldVersion < 6) await _addGamification(db);
+        if (oldVersion < 7) await _addAvatarPath(db);
       },
       // sqflite does not enforce foreign keys by default — turn them on
       // so the ON DELETE CASCADE / SET NULL rules above actually run.
@@ -157,6 +159,16 @@ class DatabaseService {
     );
 
     await applyGamificationSyncSchema(db);
+  }
+
+  /// V2 Step 15: profile photo. Adds students.avatarPath (the path of the
+  /// photo in the Supabase 'avatars' bucket). It is synced like every other
+  /// students column. Safe to run twice.
+  Future<void> _addAvatarPath(Database db) async {
+    final info = await db.rawQuery('PRAGMA table_info(students)');
+    final existing = info.map((c) => c['name'] as String).toSet();
+    if (existing.contains('avatarPath')) return;
+    await db.execute('ALTER TABLE students ADD COLUMN avatarPath TEXT');
   }
 
   Future<void> _createSchema(Database db, int version) async {

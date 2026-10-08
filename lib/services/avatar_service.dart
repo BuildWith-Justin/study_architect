@@ -1,0 +1,246 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/data_refresh_bus.dart';
+import '../features/auth/auth_service.dart';
+import 'database_service.dart';
+import 'sync_service.dart';
+
+/// An error whose message is safe to show to the user as-is.
+class AvatarException implements Exception {
+  final String message;
+  const AvatarException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// V2 Step 15: profile photo. Picks an image, uploads it to the private
+/// Supabase Storage bucket 'avatars' (folder = the user's id), saves the
+/// storage path in students.avatarPath (which SyncService then syncs to
+/// the other devices) and keeps a local cached copy so the photo shows
+/// instantly and offline.
+class AvatarService {
+  AvatarService._();
+
+  static const bucket = 'avatars';
+  static const maxBytes = 2 * 1024 * 1024; // matches the bucket limit (2 MB)
+
+  static final Map<String, File> _memo = {};
+  static final Map<String, Future<File?>> _inFlight = {};
+  static final Map<String, DateTime> _failedAt = {};
+
+  static SupabaseClient get _client => Supabase.instance.client;
+
+  // ------------------------------------------------------------------ public
+
+  /// Opens the picker, uploads the photo and saves it on the student.
+  /// Returns the new storage path, or null if the person cancelled.
+  /// Throws AvatarException with a friendly message on failure; in that
+  /// case nothing has changed.
+  static Future<String?> pickAndUpload(ImageSource source) async {
+    final uid = _requireUserId();
+    final oldPath = await _readStudentAvatarPath();
+
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+    if (picked == null) return null;
+
+    var ext = p.extension(picked.name).toLowerCase().replaceFirst('.', '');
+    if (ext == 'jpeg') ext = 'jpg';
+    final mime = _mimeFor(ext);
+    if (mime == null) {
+      throw const AvatarException('Please choose a JPG, PNG or WebP image.');
+    }
+
+    final bytes = await picked.readAsBytes();
+    if (bytes.length > maxBytes) {
+      throw const AvatarException(
+        'That photo is too large (max 2 MB). Please choose a smaller one.',
+      );
+    }
+
+    // A new file name every time: other devices see the path change and
+    // download the new photo, and no cached copy can ever be stale.
+    final newPath = '$uid/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+    try {
+      await _client.storage
+          .from(bucket)
+          .uploadBinary(
+            newPath,
+            bytes,
+            fileOptions: FileOptions(contentType: mime),
+          )
+          .timeout(const Duration(seconds: 30));
+    } catch (e) {
+      debugPrint('Avatar upload failed: $e');
+      throw const AvatarException(
+        'Could not upload the photo. Check your connection and try again.',
+      );
+    }
+
+    await _writeCache(newPath, bytes);
+    await _setStudentAvatarPath(newPath);
+
+    if (oldPath != null && oldPath != newPath) {
+      await _discard(oldPath);
+    }
+
+    _announceChange();
+    return newPath;
+  }
+
+  /// Removes the photo (the initial is shown again).
+  static Future<void> removePhoto() async {
+    final oldPath = await _readStudentAvatarPath();
+    if (oldPath == null) return;
+
+    await _setStudentAvatarPath(null);
+    await _discard(oldPath);
+    _announceChange();
+  }
+
+  /// The photo file if it is already known in memory (instant, no await).
+  static File? cachedFile(String storagePath) => _memo[storagePath];
+
+  /// The local file for [storagePath]: the cached copy, or a one-time
+  /// download from Supabase. Returns null when it is not available (for
+  /// example offline on a new device); the initial is shown meanwhile.
+  static Future<File?> localFileFor(String storagePath) {
+    final memo = _memo[storagePath];
+    if (memo != null) return Future.value(memo);
+
+    // Do not hammer the network: after a failed download wait 30 s.
+    final failed = _failedAt[storagePath];
+    if (failed != null &&
+        DateTime.now().difference(failed) < const Duration(seconds: 30)) {
+      return Future.value(null);
+    }
+
+    return _inFlight[storagePath] ??=
+        _resolve(storagePath).whenComplete(() => _inFlight.remove(storagePath));
+  }
+
+  // ----------------------------------------------------------------- private
+
+  static String _requireUserId() {
+    final user =
+        AuthService.isAvailable ? _client.auth.currentUser : null;
+    if (user == null) {
+      throw const AvatarException('Sign in to add a profile photo.');
+    }
+    return user.id;
+  }
+
+  static String? _mimeFor(String ext) {
+    switch (ext) {
+      case 'jpg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+    }
+    return null;
+  }
+
+  static Future<String?> _readStudentAvatarPath() async {
+    final db = await DatabaseService.instance.database;
+    final rows =
+        await db.query('students', columns: ['avatarPath'], limit: 1);
+    if (rows.isEmpty) {
+      throw const AvatarException('Finish setting up your profile first.');
+    }
+    return rows.first['avatarPath'] as String?;
+  }
+
+  /// Updates only this column. The students update trigger stamps
+  /// updatedAt, so SyncService uploads it on the next sync.
+  static Future<void> _setStudentAvatarPath(String? path) async {
+    final db = await DatabaseService.instance.database;
+    await db.update('students', {'avatarPath': path});
+  }
+
+  static void _announceChange() {
+    DataRefreshBus.instance.notify(RefreshScope.all);
+    if (AuthService.isAvailable) {
+      SyncService.instance.scheduleSync();
+    }
+  }
+
+  static Future<File> _cacheFile(String storagePath) async {
+    final base = await getApplicationSupportDirectory();
+    final folder = Directory(p.join(base.path, 'avatars'));
+    if (!await folder.exists()) {
+      await folder.create(recursive: true);
+    }
+    return File(p.join(folder.path, storagePath.replaceAll('/', '_')));
+  }
+
+  static Future<void> _writeCache(String storagePath, Uint8List bytes) async {
+    try {
+      final file = await _cacheFile(storagePath);
+      final tmp = File('${file.path}.tmp');
+      await tmp.writeAsBytes(bytes, flush: true);
+      await tmp.rename(file.path);
+      _memo[storagePath] = file;
+    } catch (e) {
+      debugPrint('Avatar cache write failed: $e');
+    }
+  }
+
+  static Future<File?> _resolve(String storagePath) async {
+    try {
+      final file = await _cacheFile(storagePath);
+      if (await file.exists() && await file.length() > 0) {
+        _memo[storagePath] = file;
+        return file;
+      }
+
+      if (!AuthService.isAvailable || _client.auth.currentUser == null) {
+        return null;
+      }
+
+      final bytes = await _client.storage.from(bucket).download(storagePath);
+      await _writeCache(storagePath, bytes);
+      if (await file.exists()) {
+        _memo[storagePath] = file;
+        _failedAt.remove(storagePath);
+        return file;
+      }
+    } catch (e) {
+      debugPrint('Avatar load failed: $e');
+    }
+    _failedAt[storagePath] = DateTime.now();
+    return null;
+  }
+
+  /// Best effort: deletes the cached copy and the file in Storage.
+  static Future<void> _discard(String storagePath) async {
+    _memo.remove(storagePath);
+    _failedAt.remove(storagePath);
+
+    try {
+      final file = await _cacheFile(storagePath);
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
+
+    if (!AuthService.isAvailable || _client.auth.currentUser == null) return;
+    try {
+      await _client.storage.from(bucket).remove([storagePath]);
+    } catch (e) {
+      debugPrint('Avatar remote delete failed: $e');
+    }
+  }
+}

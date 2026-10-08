@@ -15,6 +15,7 @@ import '../../widgets/pastel_card.dart';
 import '../../widgets/schedule_row.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/task_card.dart';
+import '../../widgets/user_avatar.dart';
 import '../achievements/achievements_screen.dart';
 import '../progress/progress_screen.dart';
 import '../session/focus_timer_screen.dart';
@@ -186,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen>
                 _HomeHeader(
                   greeting: _greeting(),
                   name: data.student.name,
+                  avatarPath: data.student.avatarPath,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 GestureDetector(
@@ -391,19 +393,18 @@ class _SessionAndSubject {
   const _SessionAndSubject(this.session, this.subject);
 }
 
-/// "Good morning" + student name, with an initial-letter avatar.
-/// TODO(step 15): replace the initial with the real profile photo.
+/// "Good morning" + student name, with the profile photo (or the initial
+/// when there is no photo yet).
 class _HomeHeader extends StatelessWidget {
   final String greeting;
   final String name;
+  final String? avatarPath;
 
-  const _HomeHeader({required this.greeting, required this.name});
-
-  String _initial() {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) return '?';
-    return String.fromCharCode(trimmed.runes.first).toUpperCase();
-  }
+  const _HomeHeader({
+    required this.greeting,
+    required this.name,
+    this.avatarPath,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -411,27 +412,7 @@ class _HomeHeader extends StatelessWidget {
 
     return Row(
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.primary, AppColors.teal],
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            _initial(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
+        UserAvatar(name: name, avatarPath: avatarPath, size: 48),
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
@@ -458,7 +439,6 @@ class _HomeHeader extends StatelessWidget {
     );
   }
 }
-
 /// Level, XP progress and today's XP (V2 step 13d). Tappable: opens the
 /// Achievements screen, which the arrow on the right hints at.
 // 13e-chevron
