@@ -70,7 +70,8 @@ class GamificationHooks {
 
   /// After a task was saved as completed.
   static Future<AwardResult?> taskCompleted(Task task) async {
-    final r = await _guard('taskCompleted', () => _engine.onTaskCompleted(task));
+    final r =
+        await _guard('taskCompleted', () => _engine.onTaskCompleted(task));
     await _report('task', r);
     return r;
   }

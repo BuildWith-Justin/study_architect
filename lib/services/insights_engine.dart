@@ -202,24 +202,20 @@ class InsightsEngine {
         kind: InsightKind.overdueTasks,
         icon: Icons.assignment_late_rounded,
         title: overdue == 1 ? '1 overdue task' : '$overdue overdue tasks',
-        message:
-            'Clearing the oldest one first stops them piling up.',
+        message: 'Clearing the oldest one first stops them piling up.',
         priority: 72,
         action: InsightAction.tasks,
         actionLabel: 'Open tasks',
       ));
     }
 
-    final dueToday =
-        open.where((t) => isSameDay(t.dueDate, today)).length;
+    final dueToday = open.where((t) => isSameDay(t.dueDate, today)).length;
     if (dueToday > 0 && today.hour >= 16) {
       out.add(Insight(
         id: 'due-today:${_dateKey(todayStart)}',
         kind: InsightKind.tasksDueToday,
         icon: Icons.today_rounded,
-        title: dueToday == 1
-            ? '1 task due today'
-            : '$dueToday tasks due today',
+        title: dueToday == 1 ? '1 task due today' : '$dueToday tasks due today',
         message: 'The day is nearly over, so now is a good time to finish it.',
         priority: 58,
         action: InsightAction.tasks,
@@ -318,8 +314,7 @@ class InsightsEngine {
     required Map<DateTime, int> minutesByDay,
     required DateTime today,
   }) {
-    final goal =
-        subjects.fold<int>(0, (sum, s) => sum + s.weeklyTargetMinutes);
+    final goal = subjects.fold<int>(0, (sum, s) => sum + s.weeklyTargetMinutes);
     if (goal <= 0) return const [];
 
     final weekStart = startOfWeek(today);
@@ -448,8 +443,8 @@ class InsightsEngine {
     }
 
     if (totalMinutes > 0) {
-      final top = minutesByBucket.entries
-          .reduce((a, b) => a.value >= b.value ? a : b);
+      final top =
+          minutesByBucket.entries.reduce((a, b) => a.value >= b.value ? a : b);
       final share = ((top.value / totalMinutes) * 100).round();
       if (share >= 45) {
         out.add(Insight(

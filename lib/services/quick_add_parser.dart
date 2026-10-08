@@ -82,17 +82,43 @@ class QuickAddParser {
   static const _defaultDuration = 60;
 
   static const _months = [
-    'jan', 'feb', 'mar', 'apr', 'may', 'jun',
-    'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
   ];
 
   static const _weekdays = [
-    'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun',
+    'mon',
+    'tue',
+    'wed',
+    'thu',
+    'fri',
+    'sat',
+    'sun',
   ];
 
   static const _stopWords = {
-    'the', 'for', 'and', 'due', 'task', 'todo', 'study', 'session',
-    'all', 'new', 'my', 'with',
+    'the',
+    'for',
+    'and',
+    'due',
+    'task',
+    'todo',
+    'study',
+    'session',
+    'all',
+    'new',
+    'my',
+    'with',
   };
 
   static final _prefixRe = RegExp(
@@ -103,10 +129,10 @@ class QuickAddParser {
     r'(?:\bat\s+)?\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b',
     caseSensitive: false,
   );
-  static final _time24Re = RegExp(r'(?:\bat\s+)?\b([01]?\d|2[0-3]):([0-5]\d)\b');
+  static final _time24Re =
+      RegExp(r'(?:\bat\s+)?\b([01]?\d|2[0-3]):([0-5]\d)\b');
   static final _isoRe = RegExp(r'\b(\d{4})-(\d{1,2})-(\d{1,2})\b');
-  static final _slashRe =
-      RegExp(r'\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b');
+  static final _slashRe = RegExp(r'\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b');
   static const _monthNames =
       'january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|'
       'august|aug|september|sept|sep|october|oct|november|nov|december|dec';
@@ -177,8 +203,8 @@ class QuickAddParser {
     int durationMinutes,
   ) {
     final d = startOfDay(date);
-    final start = DateTime(d.year, d.month, d.day, startMinutes ~/ 60,
-        startMinutes % 60);
+    final start =
+        DateTime(d.year, d.month, d.day, startMinutes ~/ 60, startMinutes % 60);
     var end = start.add(Duration(minutes: durationMinutes));
     var clamped = false;
     if (!isSameDay(end, start)) {
@@ -230,8 +256,7 @@ class QuickAddParser {
     if (startMinutes == null) {
       final m24 = _time24Re.firstMatch(work);
       if (m24 != null) {
-        startMinutes =
-            int.parse(m24.group(1)!) * 60 + int.parse(m24.group(2)!);
+        startMinutes = int.parse(m24.group(1)!) * 60 + int.parse(m24.group(2)!);
         work = _cut(work, m24);
       }
     }
@@ -244,8 +269,8 @@ class QuickAddParser {
         'tonight': 19 * 60,
       };
       for (final entry in words.entries) {
-        final m = RegExp('\\b${entry.key}\\b', caseSensitive: false)
-            .firstMatch(work);
+        final m =
+            RegExp('\\b${entry.key}\\b', caseSensitive: false).firstMatch(work);
         if (m != null) {
           startMinutes = entry.value;
           if (entry.key == 'tonight') tonight = true;
@@ -342,7 +367,8 @@ class QuickAddParser {
     if (date == null) {
       m = _weekdayRe.firstMatch(work);
       if (m != null) {
-        final target = _weekdays.indexOf(m.group(2)!.toLowerCase().substring(0, 3)) + 1;
+        final target =
+            _weekdays.indexOf(m.group(2)!.toLowerCase().substring(0, 3)) + 1;
         var delta = (target - today.weekday) % 7;
         if (m.group(1) != null && delta == 0) delta = 7;
         date = _addDays(today, delta);

@@ -90,7 +90,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) _showMessage(e.message);
     } catch (e) {
       debugPrint('Photo pick failed: $e');
-      if (mounted) _showMessage('Could not change the photo. Please try again.');
+      if (mounted)
+        _showMessage('Could not change the photo. Please try again.');
     } finally {
       if (mounted) setState(() => _photoBusy = false);
     }
@@ -111,7 +112,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) _showMessage(e.message);
     } catch (e) {
       debugPrint('Photo remove failed: $e');
-      if (mounted) _showMessage('Could not remove the photo. Please try again.');
+      if (mounted)
+        _showMessage('Could not remove the photo. Please try again.');
     } finally {
       if (mounted) setState(() => _photoBusy = false);
     }

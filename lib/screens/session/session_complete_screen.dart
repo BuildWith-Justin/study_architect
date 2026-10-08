@@ -299,7 +299,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.military_tech_rounded, color: Colors.white),
+                    const Icon(Icons.military_tech_rounded,
+                        color: Colors.white),
                     const SizedBox(width: AppSpacing.sm),
                     Flexible(
                       child: Text(

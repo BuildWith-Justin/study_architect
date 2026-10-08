@@ -82,8 +82,7 @@ class _AiInsightsSectionState extends State<AiInsightsSection> {
 
   bool _showsAction(Insight insight) {
     if (insight.action == InsightAction.none) return false;
-    if (insight.action == InsightAction.progress &&
-        widget.hideProgressAction) {
+    if (insight.action == InsightAction.progress && widget.hideProgressAction) {
       return false;
     }
     return true;

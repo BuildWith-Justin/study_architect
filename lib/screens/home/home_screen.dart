@@ -439,6 +439,7 @@ class _HomeHeader extends StatelessWidget {
     );
   }
 }
+
 /// Level, XP progress and today's XP (V2 step 13d). Tappable: opens the
 /// Achievements screen, which the arrow on the right hints at.
 // 13e-chevron
@@ -463,9 +464,8 @@ class _LevelXpCard extends StatelessWidget {
         detail = 'Max level reached';
       } else {
         xpText = '${level.xpIntoLevel} / ${level.levelSize} XP';
-        final today = snap.xpToday > 0
-            ? '+${snap.xpToday} XP today'
-            : 'Study to earn XP';
+        final today =
+            snap.xpToday > 0 ? '+${snap.xpToday} XP today' : 'Study to earn XP';
         detail = '$today · ${level.xpToNext} XP to Level ${level.level + 1}';
       }
     }

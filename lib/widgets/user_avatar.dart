@@ -43,8 +43,9 @@ class _UserAvatarState extends State<UserAvatar> {
     final changed = oldWidget.avatarPath != path;
     // Also retry when a photo is expected but not on this device yet
     // (for example the download failed while offline).
-    final missing =
-        path != null && path.isNotEmpty && AvatarService.cachedFile(path) == null;
+    final missing = path != null &&
+        path.isNotEmpty &&
+        AvatarService.cachedFile(path) == null;
     if (changed || missing) {
       _future = _resolve();
     }

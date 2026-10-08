@@ -47,6 +47,10 @@ void main() async {
   // Safe no-op on Web — see notification_service.dart for why.
   await NotificationService.instance.init();
 
+  // V2 Step 16: re-apply reminders from the saved settings (daily goal,
+  // exams). Never throws, runs in the background.
+  NotificationService.instance.applyAllSafe();
+
   // V2 Step 13: gives XP to existing sessions and tasks the first time,
   // then keeps the ledger in line with the data. Runs in the background.
   GamificationHooks.startupRebuild();

@@ -35,10 +35,28 @@ class _QuickAddSheet extends StatefulWidget {
 
 class _QuickAddSheetState extends State<_QuickAddSheet> {
   static const _uuid = Uuid();
-  static const _weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _weekdayNames = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
+  ];
   static const _monthNames = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   static const _durationChoices = [15, 30, 45, 60, 90, 120, 180, 240];
 
@@ -149,7 +167,8 @@ class _QuickAddSheetState extends State<_QuickAddSheet> {
   Future<void> _save() async {
     final parsed = _parsed;
     if (parsed == null) {
-      setState(() => _error = 'Type something first, e.g. "Maths tomorrow 4pm 1h".');
+      setState(
+          () => _error = 'Type something first, e.g. "Maths tomorrow 4pm 1h".');
       return;
     }
     final subjectId = _subjectId;
@@ -225,7 +244,8 @@ class _QuickAddSheetState extends State<_QuickAddSheet> {
         hints.add('No time found, using ${_formatTime(parsed.startMinutes)}.');
       }
       if (parsed.durationAssumed) {
-        hints.add('No duration found, using ${formatDuration(parsed.durationMinutes)}.');
+        hints.add(
+            'No duration found, using ${formatDuration(parsed.durationMinutes)}.');
       }
       final window =
           QuickAddParser.sessionWindow(_date, _startMinutes, _duration);

@@ -135,8 +135,7 @@ class AvatarService {
   // ----------------------------------------------------------------- private
 
   static String _requireUserId() {
-    final user =
-        AuthService.isAvailable ? _client.auth.currentUser : null;
+    final user = AuthService.isAvailable ? _client.auth.currentUser : null;
     if (user == null) {
       throw const AvatarException('Sign in to add a profile photo.');
     }
@@ -157,8 +156,7 @@ class AvatarService {
 
   static Future<String?> _readStudentAvatarPath() async {
     final db = await DatabaseService.instance.database;
-    final rows =
-        await db.query('students', columns: ['avatarPath'], limit: 1);
+    final rows = await db.query('students', columns: ['avatarPath'], limit: 1);
     if (rows.isEmpty) {
       throw const AvatarException('Finish setting up your profile first.');
     }

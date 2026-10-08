@@ -232,7 +232,8 @@ class _ProgressScreenState extends State<ProgressScreen>
                                     const SizedBox(height: AppSpacing.lg),
                                   ],
                                   _StreakCard(data: data),
-                                  AiInsightsSection(loadToken: identityHashCode(data)),
+                                  AiInsightsSection(
+                                      loadToken: identityHashCode(data)),
                                 ],
                               ),
                             );

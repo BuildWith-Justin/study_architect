@@ -17,7 +17,9 @@ import '../achievements/achievements_screen.dart';
 import '../calendar/calendar_screen.dart';
 import '../progress/progress_screen.dart';
 import '../tasks/tasks_screen.dart';
+import 'appearance_screen.dart';
 import 'backup_screen.dart';
+import 'notifications_screen.dart';
 import 'edit_goals_screen.dart';
 import 'edit_profile_screen.dart';
 import 'more_view_data.dart';
@@ -100,11 +102,10 @@ class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
 
       try {
         if (enabled) {
-          await NotificationService.instance.scheduleDailyGoalReminder(
-            const TimeOfDay(hour: 19, minute: 0),
-          );
+          await NotificationService.instance.requestPermissions();
+          await NotificationService.instance.applyAll();
         } else {
-          await NotificationService.instance.cancelDailyGoalReminder();
+          await NotificationService.instance.cancelAllReminders();
         }
       } catch (_) {
         // The setting was already saved.
@@ -320,42 +321,43 @@ class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
               const SizedBox(height: AppSpacing.md),
 
               _SectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  );
+
+                  if (mounted) {
+                    await _reload();
+                  }
+                },
+                child: _rowLabelValue(
+                  'Reminders',
+                  'Daily, sessions, exams',
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              _SectionCard(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AppearanceScreen(),
+                  ),
+                ),
+                child: ValueListenableBuilder<ThemeMode>(
+                  valueListenable: ThemeController.instance.mode,
+                  builder: (context, mode, _) {
+                    return _rowLabelValue(
                       'Appearance',
-                      style: TextStyle(
-                        color: context.primaryText,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    ValueListenableBuilder<ThemeMode>(
-                      valueListenable: ThemeController.instance.mode,
-                      builder: (context, mode, _) {
-                        return SegmentedButton<ThemeMode>(
-                          segments: const [
-                            ButtonSegment(
-                              value: ThemeMode.system,
-                              label: Text('System'),
-                            ),
-                            ButtonSegment(
-                              value: ThemeMode.light,
-                              label: Text('Light'),
-                            ),
-                            ButtonSegment(
-                              value: ThemeMode.dark,
-                              label: Text('Dark'),
-                            ),
-                          ],
-                          selected: {mode},
-                          onSelectionChanged: (s) {
-                            ThemeController.instance.setMode(s.first);
-                          },
-                        );
-                      },
-                    ),
-                  ],
+                      mode == ThemeMode.dark
+                          ? 'Dark'
+                          : mode == ThemeMode.light
+                              ? 'Light'
+                              : 'System',
+                    );
+                  },
                 ),
               ),
 
@@ -452,7 +454,7 @@ class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
                 },
                 child: _rowLabelValue(
                   'Data & Backup',
-                  'Export or import',
+                  'Safety copy, restore, reset',
                 ),
               ),
 
@@ -532,17 +534,17 @@ class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
                   showAboutDialog(
                     context: context,
                     applicationName: 'Study Architect',
-                    applicationVersion: 'V1',
+                    applicationVersion: 'V2',
                     children: const [
                       Text(
-                        'A local-first study planning and tracking app.',
+                        'A study planner that works offline and syncs to your account.',
                       ),
                     ],
                   );
                 },
                 child: _rowLabelValue(
                   'About',
-                  'Study Architect V1',
+                  'Study Architect V2',
                 ),
               ),
             ],
