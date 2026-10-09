@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme_controller.dart';
+import '../../core/data_refresh_bus.dart';
+import '../../core/refreshable_screen.dart';
 import '../../repositories/settings_repository.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
@@ -31,10 +33,19 @@ class MoreScreen extends StatefulWidget {
   State<MoreScreen> createState() => _MoreScreenState();
 }
 
-class _MoreScreenState extends State<MoreScreen> with WidgetsBindingObserver {
+class _MoreScreenState extends State<MoreScreen>
+    with WidgetsBindingObserver, RefreshableScreenMixin<MoreScreen> {
   late Future<MoreViewData> _future;
 
   final _settingsRepo = SettingsRepository();
+
+  @override
+  List<RefreshScope> get watchedScopes => [
+      RefreshScope.achievements,
+    ];
+
+  @override
+  Future<void> onRefresh() => _reload();
 
   bool? _notificationOverride;
   bool _isUpdatingNotifications = false;

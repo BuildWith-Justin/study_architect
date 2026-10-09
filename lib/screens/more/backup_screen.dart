@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../app/startup_decider.dart';
 import '../../features/auth/auth_service.dart';
 import '../../gamification/gamification_hooks.dart';
+import '../../core/data_refresh_bus.dart';
 import '../../services/app_prefs.dart';
 import '../../services/backup_service.dart';
 import '../../services/database_service.dart';
@@ -112,6 +113,7 @@ class _BackupScreenState extends State<BackupScreen> {
       await _backupService.saveSafetyCopy();
       await _backupService.restore(backup);
       await GamificationHooks.afterRestore();
+      DataRefreshBus.instance.notify(RefreshScope.all);
       await _resetReminders();
 
       _snack('Backup restored.');
