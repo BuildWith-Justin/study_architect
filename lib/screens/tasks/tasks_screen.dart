@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../models/subject.dart';
 import '../../models/task.dart';
 import '../../repositories/task_repository.dart';
+import '../../core/data_refresh_bus.dart';
+import '../../core/refreshable_screen.dart';
 import '../../gamification/gamification_hooks.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
@@ -18,8 +20,18 @@ class TasksScreen extends StatefulWidget {
   State<TasksScreen> createState() => _TasksScreenState();
 }
 
-class _TasksScreenState extends State<TasksScreen> {
+class _TasksScreenState extends State<TasksScreen>
+    with RefreshableScreenMixin<TasksScreen> {
   final _taskRepo = TaskRepository();
+
+  @override
+  List<RefreshScope> get watchedScopes => [
+      RefreshScope.tasks,
+      RefreshScope.subjects,
+    ];
+
+  @override
+  Future<void> onRefresh() => _reload();
 
   /// The list currently on screen. Held in state (not in a Future) so
   /// every change goes through a plain setState.
@@ -92,6 +104,9 @@ class _TasksScreenState extends State<TasksScreen> {
       );
       return;
     }
+
+    // V2 Step 17: tell Home, Progress and the other screens that tasks changed.
+    DataRefreshBus.instance.notify(RefreshScope.tasks);
 
     // 3) Reload from the database.
     await _reload();

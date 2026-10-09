@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/refreshable_screen.dart';
+import '../../core/data_refresh_bus.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
 import '../../widgets/app_buttons.dart';
@@ -60,6 +61,13 @@ class _SubjectsScreenState extends State<SubjectsScreen>
   /// Called by RefreshableScreenMixin when sync brings in cloud changes.
   @override
   Future<void> onRefresh() => _reload();
+
+  @override
+  List<RefreshScope> get watchedScopes => [
+      RefreshScope.subjects,
+      RefreshScope.sessions,
+      RefreshScope.tasks,
+    ];
 
   Future<void> _openAdd() async {
     await Navigator.of(context).push<bool>(

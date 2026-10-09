@@ -4,6 +4,7 @@ import '../../models/task.dart';
 import '../../models/subject.dart';
 import '../../models/topic.dart';
 import '../../repositories/task_repository.dart';
+import '../../core/data_refresh_bus.dart';
 import '../../repositories/subject_repository.dart';
 import '../../repositories/topic_repository.dart';
 import '../../gamification/gamification_hooks.dart';
@@ -106,8 +107,10 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
 
     if (_isEditing) {
       await _taskRepo.update(task);
+      DataRefreshBus.instance.notify(RefreshScope.tasks);
     } else {
       await _taskRepo.create(task);
+      DataRefreshBus.instance.notify(RefreshScope.tasks);
     }
 
     if (!mounted) return;
@@ -135,6 +138,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     if (confirmed != true) return;
     await _taskRepo.delete(widget.existing!.id);
     await GamificationHooks.taskRemoved(widget.existing!.id);
+    DataRefreshBus.instance.notify(RefreshScope.tasks);
     if (!mounted) return;
     Navigator.of(context).pop(true);
   }

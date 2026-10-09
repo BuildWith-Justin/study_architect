@@ -112,6 +112,14 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   @override
   Future<void> onRefresh() => _refresh();
 
+  @override
+  List<RefreshScope> get watchedScopes => [
+      RefreshScope.subjects,
+      RefreshScope.sessions,
+      RefreshScope.tasks,
+      RefreshScope.exams,
+    ];
+
   /// Tells the other screens (for example the Subjects list underneath
   /// this one) that subject or topic data changed.
   void _notifyChanged() {

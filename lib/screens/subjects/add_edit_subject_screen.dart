@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/subject.dart';
 import '../../models/topic.dart';
 import '../../repositories/subject_repository.dart';
+import '../../core/data_refresh_bus.dart';
 import '../../repositories/topic_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
@@ -166,6 +167,7 @@ class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
         );
       }
 
+      DataRefreshBus.instance.notify(RefreshScope.subjects);
       Navigator.of(context).pop(true);
     } catch (_) {
       if (!mounted) return;
