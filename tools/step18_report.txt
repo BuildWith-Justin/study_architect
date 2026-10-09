@@ -1,0 +1,121 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261009002859
+Username: DESKTOP-FPB9CTO\HP
+RunAs User: DESKTOP-FPB9CTO\HP
+Configuration Name: 
+Machine: DESKTOP-FPB9CTO (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File tools\step18_check.ps1
+Process ID: 21668
+PSVersion: 5.1.26100.9549
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9549
+BuildVersion: 10.0.26100.9549
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+
+=== 1. flutter pub get ===
+
+
+=== 2. dart format (check only, nothing is changed) ===
+
+
+=== 3. flutter analyze ===
+
+
+=== 4. flutter test ===
+
+
+=== 5. Refresh audit of every screen ===
+
+File                                               Mixin PullToRefresh DataBus
+----                                               ----- ------------- -------
+lib\screens\achievements\achievements_screen.dart   True         False   False
+lib\screens\calendar\calendar_screen.dart           True         False    True
+lib\screens\calendar\calendar_view_data.dart       False         False   False
+lib\screens\exams\add_edit_exam_screen.dart        False         False    True
+lib\screens\exams\exams_screen.dart                False         False   False
+lib\screens\exams\exams_view.dart                   True          True   False
+lib\screens\exams\exams_view_data.dart             False         False   False
+lib\screens\exams\exam_detail_screen.dart           True          True    True
+lib\screens\home\home_screen.dart                   True         False    True
+lib\screens\home\home_view_data.dart               False         False   False
+lib\screens\home\next_exam_card.dart                True         False   False
+lib\screens\more\appearance_screen.dart            False         False   False
+lib\screens\more\backup_screen.dart                False          True    True
+lib\screens\more\edit_goals_screen.dart            False         False    True
+lib\screens\more\edit_profile_screen.dart          False         False    True
+lib\screens\more\more_screen.dart                   True          True   False
+lib\screens\more\more_view_data.dart               False         False   False
+lib\screens\more\notifications_screen.dart         False          True   False
+lib\screens\onboarding\goal_dial_screen.dart       False         False   False
+lib\screens\onboarding\goal_setup_screen.dart      False         False   False
+lib\screens\onboarding\onboarding_flow.dart        False         False   False
+lib\screens\onboarding\profile_setup_screen.dart   False         False   False
+lib\screens\onboarding\subjects_setup_screen.dart  False         False   False
+lib\screens\onboarding\subject_setup_screen.dart   False         False   False
+lib\screens\onboarding\welcome_screen.dart         False         False   False
+lib\screens\plan\plan_session_screen.dart          False         False   False
+lib\screens\progress\progress_screen.dart           True         False    True
+lib\screens\progress\progress_view_data.dart       False         False   False
+lib\screens\progress\weekly_report_screen.dart      True         False    True
+lib\screens\progress\weekly_report_view_data.dart  False         False   False
+lib\screens\session\create_session_screen.dart     False         False    True
+lib\screens\session\focus_timer_screen.dart        False         False    True
+lib\screens\session\session_complete_screen.dart   False         False    True
+lib\screens\subjects\add_edit_subject_screen.dart  False         False    True
+lib\screens\subjects\subjects_screen.dart           True          True   False
+lib\screens\subjects\subjects_view_data.dart       False         False   False
+lib\screens\subjects\subject_detail_screen.dart     True          True    True
+lib\screens\tasks\add_edit_task_screen.dart        False         False    True
+lib\screens\tasks\tasks_screen.dart                 True          True    True
+lib\screens\tasks\tasks_view_data.dart             False         False   False
+lib\screens\timetable\add_edit_session_screen.dart False         False    True
+lib\screens\timetable\plan_session_screen.dart     False         False   False
+lib\screens\timetable\timetable_screen.dart         True         False    True
+lib\screens\timetable\timetable_view_data.dart     False         False   False
+
+
+Reminder: Tasks screen is a known exception. Onboarding/auth screens do not need refresh.
+
+=== 6. TODO / FIXME left in code ===
+lib\screens\achievements\achievements_screen.dart:571  : (progress / badge.target).clamp(0.0, 1.0).toDouble();
+lib\screens\more\edit_goals_screen.dart:195  value: _weekly.toDouble(),
+lib\screens\more\edit_goals_screen.dart:196  min: _weeklyMin.toDouble(),
+lib\screens\more\edit_goals_screen.dart:197  max: _weeklyMax.toDouble(),
+lib\screens\onboarding\goal_dial_screen.dart:69  value: _minutes.clamp(15, 480).toDouble(),
+lib\screens\session\focus_timer_screen.dart:90  return (1 - _elapsed.inMilliseconds / goalMs).clamp(0.0, 1.0).toDouble();
+lib\screens\subjects\add_edit_subject_screen.dart:63  ((existing?.weeklyTargetMinutes ?? 360) / 60).toDouble();
+lib\screens\subjects\subject_detail_screen.dart:401  : (thisWeekMinutes / targetMinutes).clamp(0.0, 1.0).toDouble();
+lib\services\quick_add_parser.dart:115  'todo',
+lib\services\quick_add_parser.dart:125  r'^(task|todo|to-do|session)\b\s*[:\-]?\s*',
+lib\widgets\study_bar_chart.dart:46  final maxY = (((maxMinutes ~/ step) + 1) * step).toDouble();
+lib\widgets\study_bar_chart.dart:60  toY: points[i].value.toDouble(),
+lib\widgets\study_bar_chart.dart:85  horizontalInterval: step.toDouble(),
+lib\widgets\study_bar_chart.dart:116  interval: step.toDouble(),
+
+=== 7. Secrets safety ===
+.env is not tracked by Git. Good.
+
+=== 8. Debug print() calls in lib ===
+Found 0 print() call(s).
+
+=== SUMMARY ===
+
+Check                     Result
+-----                     ------
+pub get                   PASS
+dart format               FAIL
+flutter analyze           FAIL
+flutter test              FAIL
+.env not tracked          PASS
+.env listed in .gitignore PASS
+
+
+**********************
+Windows PowerShell transcript end
+End time: 20261009002957
+**********************

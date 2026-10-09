@@ -1,0 +1,46 @@
+
+
+===== lib\widgets\app_logo.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+/// The Study Architect "A" mark, drawn in code (no image asset needed).
+class AppLogo extends StatelessWidget {
+  final double size;
+  const AppLogo({super.key, this.size = 72});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(size: Size.square(size), painter: _LogoPainter());
+  }
+}
+
+class _LogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final w = s.width;
+    final h = s.height;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.13
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [AppColors.teal, AppColors.accentBlueStrong],
+      ).createShader(Offset.zero & s);
+
+    final path = Path()
+      ..moveTo(w * 0.14, h * 0.86)
+      ..lineTo(w * 0.5, h * 0.14)
+      ..lineTo(w * 0.86, h * 0.86)
+      ..moveTo(w * 0.30, h * 0.62)
+      ..lineTo(w * 0.70, h * 0.62);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

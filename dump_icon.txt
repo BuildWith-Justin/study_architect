@@ -1,0 +1,520 @@
+
+
+===== pubspec.yaml =====
+name: study_architect
+description: "Study Architect — local-first Flutter study planner and tracker."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.2.1
+  sqflite: ^2.3.3
+  sqflite_common_ffi: ^2.4.3
+  path: ^1.9.0
+  uuid: ^4.6.0
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
+  file_picker: ^13.1.0
+  share_plus: ^13.3.0
+  path_provider: ^2.1.4
+  supabase_flutter: ^2.8.0
+  flutter_dotenv: ^5.2.1
+  url_launcher: ^6.3.2
+  fl_chart: ^1.2.0
+  table_calendar: ^3.2.0
+  image_picker: ^1.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
+
+===== lib\main.dart =====
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app/app.dart';
+import 'features/auth/auth_service.dart';
+import 'services/notification_service.dart';
+import 'gamification/gamification_hooks.dart';
+import 'services/sync_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Plain sqflite only ships a native database engine for Android/iOS.
+  // On Windows and Linux desktop there is no such engine bundled, so
+  // sqflite_common_ffi's databaseFactory must be installed explicitly
+  // before DatabaseService (or anything else) opens a database —
+  // otherwise every DB call throws "databaseFactory not initialized."
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
+  // V2: load Supabase credentials from .env and start the client.
+  // Wrapped in try/catch so a missing .env or a Supabase problem never
+  // stops the local-first app from launching.
+  try {
+    await dotenv.load(fileName: '.env');
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL']!,
+      publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    );
+    // Only flips to true when init fully succeeded. AuthGate reads this
+    // so it never touches Supabase.instance when the client isn't ready.
+    AuthService.isAvailable = true;
+    debugPrint('Supabase initialized OK');
+
+    // V2 Step 4: start local <-> cloud sync (does nothing until signed in).
+    SyncService.instance.start();
+  } catch (e) {
+    AuthService.isAvailable = false;
+    debugPrint('Supabase init failed: $e');
+  }
+
+  // Safe no-op on Web — see notification_service.dart for why.
+  await NotificationService.instance.init();
+
+  // V2 Step 16: re-apply reminders from the saved settings (daily goal,
+  // exams). Never throws, runs in the background.
+  NotificationService.instance.applyAllSafe();
+
+  // V2 Step 13: gives XP to existing sessions and tasks the first time,
+  // then keeps the ledger in line with the data. Runs in the background.
+  GamificationHooks.startupRebuild();
+  runApp(const StudyArchitectApp());
+}
+
+
+===== android\app\src\main\AndroidManifest.xml =====
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <application
+        android:label="study_architect"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        
+            <!-- Supabase OAuth return link (Google sign-in) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="io.supabase.studyarchitect" android:host="login-callback" />
+            </intent-filter>
+        </activity>
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>
+
+===== .\lib\app\theme_controller.dart =====
+import 'package:flutter/material.dart';
+import '../repositories/settings_repository.dart';
+
+/// Single source of truth for the app's current ThemeMode. MaterialApp
+/// listens to [mode] directly, so calling [setMode] anywhere in the
+/// app (from the More/Settings screen) updates every screen
+/// immediately — no restart needed.
+class ThemeController {
+  ThemeController._internal();
+  static final ThemeController instance = ThemeController._internal();
+
+  final ValueNotifier<ThemeMode> mode = ValueNotifier(ThemeMode.system);
+  final _settingsRepo = SettingsRepository();
+
+  Future<void> loadFromSettings() async {
+    final settings = await _settingsRepo.get();
+    mode.value = settings.themeMode;
+  }
+
+  Future<void> setMode(ThemeMode newMode) async {
+    mode.value = newMode;
+    final current = await _settingsRepo.get();
+    await _settingsRepo.save(current.copyWith(themeMode: newMode));
+  }
+}
+
+
+===== .\lib\theme\app_theme.dart =====
+import 'package:flutter/material.dart';
+
+/// Design tokens for Study Architect V2 (teal-green + navy reference sheet).
+/// Single source of truth for colours. Estimated from the reference image:
+/// adjust the hex values here and the whole app follows.
+class AppColors {
+  AppColors._();
+
+  // Brand
+  static const primary = Color(0xFF16A37F);
+  static const primaryDark = Color(0xFF0E8A6B);
+  static const primarySoft = Color(0xFFD9F2EA);
+  static const teal = Color(0xFF1FD0B5);
+
+  // Page background gradients
+  static const backgroundGradientTop = Color(0xFFF1F7F6);
+  static const backgroundGradientBottom = Color(0xFFE4EEF2);
+  static const darkBackgroundGradientTop = Color(0xFF0F1B2E);
+  static const darkBackgroundGradientBottom = Color(0xFF0A1220);
+
+  // Surfaces
+  static const surfaceLight = Color(0xFFF7FAFA);
+  static const surfaceLightAlt = Color(0xFFFFFFFF);
+  static const surfaceDark = Color(0xFF16233A);
+  static const surfaceDarkAlt = Color(0xFF1B2A44);
+
+  // Tinted cards (classes, tasks, timetable events)
+  static const accentBlue = Color(0xFFDCE9FB);
+  static const accentPurple = Color(0xFFE9E1FA);
+  static const accentGreen = Color(0xFFD6F1E6);
+
+  // Saturated versions (timeline dots, charts, subject colours)
+  static const accentBlueStrong = Color(0xFF4C8DF6);
+  static const accentPurpleStrong = Color(0xFF8B6FE0);
+  static const accentGreenStrong = Color(0xFF1FB57F);
+
+  // Text
+  static const textPrimary = Color(0xFF14213D);
+  static const textSecondary = Color(0xFF6B7A90);
+  static const textPrimaryDark = Color(0xFFEAF1FA);
+  static const textSecondaryDark = Color(0xFF93A4BE);
+
+  // Nav bar
+  static const navInactive = Color(0xFFA9B5C4);
+  static const navInactiveDark = Color(0xFF56657F);
+
+  // Destructive actions
+  static const danger = Color(0xFFD64545);
+
+  // Theme-aware helpers
+  static bool isDark(BuildContext c) =>
+      Theme.of(c).brightness == Brightness.dark;
+  static Color primaryText(BuildContext c) =>
+      isDark(c) ? textPrimaryDark : textPrimary;
+  static Color secondaryText(BuildContext c) =>
+      isDark(c) ? textSecondaryDark : textSecondary;
+  static Color card(BuildContext c) =>
+      isDark(c) ? surfaceDarkAlt : surfaceLightAlt;
+}
+
+class AppRadii {
+  AppRadii._();
+  static const outer = 24.0;
+  static const card = 16.0;
+  static const cardSmall = 14.0;
+  static const control = 10.0;
+  static const button = 14.0;
+}
+
+class AppSpacing {
+  AppSpacing._();
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 24.0;
+}
+
+
+===== .\lib\theme\dark_theme.dart =====
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'app_theme.dart';
+
+ThemeData buildDarkTheme() {
+  final base = ThemeData.dark(useMaterial3: true);
+  final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+    bodyColor: AppColors.textPrimaryDark,
+    displayColor: AppColors.textPrimaryDark,
+  );
+
+  return base.copyWith(
+    scaffoldBackgroundColor: AppColors.darkBackgroundGradientTop,
+    textTheme: textTheme,
+    colorScheme: base.colorScheme.copyWith(
+      primary: AppColors.primary,
+      secondary: AppColors.accentBlueStrong,
+      surface: AppColors.surfaceDark,
+    ),
+    cardTheme: const CardThemeData(
+      color: AppColors.surfaceDarkAlt,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(AppRadii.card)),
+      ),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: AppColors.textPrimaryDark,
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.surfaceDarkAlt,
+      selectedItemColor: AppColors.textPrimaryDark,
+      unselectedItemColor: AppColors.navInactiveDark,
+      showSelectedLabels: false,
+      showUnselectedLabels: false,
+      type: BottomNavigationBarType.fixed,
+      elevation: 0,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.surfaceDarkAlt,
+        foregroundColor: AppColors.textPrimaryDark,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+      ),
+    ),
+  );
+}
+
+
+===== .\lib\theme\light_theme.dart =====
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'app_theme.dart';
+
+ThemeData buildLightTheme() {
+  final base = ThemeData.light(useMaterial3: true);
+  final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+    bodyColor: AppColors.textPrimary,
+    displayColor: AppColors.textPrimary,
+  );
+
+  return base.copyWith(
+    scaffoldBackgroundColor: AppColors.backgroundGradientTop,
+    textTheme: textTheme,
+    colorScheme: base.colorScheme.copyWith(
+      primary: AppColors.primary,
+      secondary: AppColors.accentBlueStrong,
+      surface: AppColors.surfaceLight,
+    ),
+    cardTheme: const CardThemeData(
+      color: AppColors.surfaceLightAlt,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(AppRadii.card)),
+      ),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: AppColors.textPrimary,
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.surfaceLightAlt,
+      selectedItemColor: AppColors.textPrimary,
+      unselectedItemColor: AppColors.navInactive,
+      showSelectedLabels: false,
+      showUnselectedLabels: false,
+      type: BottomNavigationBarType.fixed,
+      elevation: 0,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.surfaceLightAlt,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+      ),
+    ),
+  );
+}
+
+
+===== .\lib\theme\theme_helpers.dart =====
+import 'package:flutter/material.dart';
+import 'app_theme.dart';
+
+/// Shorthand for the isDark-branch pattern already used in
+/// StatCard/ProgressCard since Step 2 — lets every other screen pick
+/// up the same "dedicated dark scheme, not just inverted" behavior
+/// without repeating `Theme.of(context).brightness == Brightness.dark`
+/// everywhere.
+///
+/// Deliberately NOT used inside form input fields (TextField /
+/// DropdownButtonFormField fill colors and their typed-text color) —
+/// those stay a fixed light surface with fixed dark text in both
+/// themes, since that was a specific, already-debugged fix and
+/// switching it per-theme risks reintroducing invisible typed text.
+extension ThemeAwareColors on BuildContext {
+  bool get isDarkMode => Theme.of(this).brightness == Brightness.dark;
+
+  /// Plain info/stat card background — e.g. a settings row, a summary
+  /// box. Not for pastel accent cards, which stay the same hue in
+  /// both themes by design.
+  Color get cardSurface =>
+      isDarkMode ? AppColors.surfaceDark : AppColors.surfaceLight;
+
+  Color get cardSurfaceAlt =>
+      isDarkMode ? AppColors.surfaceDarkAlt : AppColors.surfaceLightAlt;
+
+  /// Body text sitting on a [cardSurface] (not on a pastel card, and
+  /// not typed text inside a form field).
+  Color get primaryText =>
+      isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary;
+
+  Color get secondaryText =>
+      isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary;
+}
+
+
+===== .\lib\widgets\splash_view.dart =====
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+import 'app_logo.dart';
+
+/// Dark splash shown while the app decides where to go.
+class SplashView extends StatelessWidget {
+  const SplashView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.darkBackgroundGradientTop,
+              AppColors.surfaceDarkAlt,
+              Color(0xFF3A2E4F),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const Spacer(flex: 3),
+              const AppLogo(size: 84),
+              const SizedBox(height: AppSpacing.lg),
+              RichText(
+                text: const TextSpan(
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                  children: [
+                    TextSpan(text: 'Study '),
+                    TextSpan(
+                      text: 'Architect',
+                      style: TextStyle(color: AppColors.teal),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const Text(
+                'Plan  ·  Study  ·  Achieve',
+                style: TextStyle(
+                  fontSize: 14,
+                  letterSpacing: 1,
+                  color: AppColors.textSecondaryDark,
+                ),
+              ),
+              const Spacer(flex: 4),
+              const Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.xl),
+                child: Text(
+                  'Your personal study companion\nfor a better tomorrow.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: AppColors.textSecondaryDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+===== EXISTING LAUNCHER ICONS =====
+C:\Users\HP\Desktop\work\Flutter\study_architect\android\app\src\main\res\mipmap-hdpi\ic_launcher.png
+C:\Users\HP\Desktop\work\Flutter\study_architect\android\app\src\main\res\mipmap-mdpi\ic_launcher.png
+C:\Users\HP\Desktop\work\Flutter\study_architect\android\app\src\main\res\mipmap-xhdpi\ic_launcher.png
+C:\Users\HP\Desktop\work\Flutter\study_architect\android\app\src\main\res\mipmap-xxhdpi\ic_launcher.png
+C:\Users\HP\Desktop\work\Flutter\study_architect\android\app\src\main\res\mipmap-xxxhdpi\ic_launcher.png
