@@ -350,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen>
           '${formatTimeOfDay(session.startTime)} - ${formatTimeOfDay(session.endTime)}',
       title: subject?.name ?? 'Unknown subject',
       hue: _hueForSubject(subject),
-      actionLabel: isLive ? 'Start session' : 'View details',
+      actionLabel: isLive ? 'Start session' : null,
       onAction: isLive
           ? () => _openScreen(
                 FocusTimerScreen(
@@ -363,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen>
                   goal: session.endTime.difference(session.startTime),
                 ),
               )
-          : () {},
+          : null,
     );
   }
 

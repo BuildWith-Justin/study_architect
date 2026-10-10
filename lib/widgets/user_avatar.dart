@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,7 +9,8 @@ import '../theme/app_theme.dart';
 /// V2 Step 15: the one avatar used everywhere (Home, More, Edit profile).
 /// Shows the real profile photo when there is one, otherwise the initial
 /// on the green gradient circle (also while the photo is loading, or if it
-/// cannot be loaded).
+/// cannot be loaded). A photo already stored on the phone is drawn
+/// immediately; otherwise it is loaded, with two retries a few seconds apart.
 class UserAvatar extends StatefulWidget {
   final String name;
   final String? avatarPath;
@@ -29,11 +31,19 @@ class UserAvatar extends StatefulWidget {
 
 class _UserAvatarState extends State<UserAvatar> {
   Future<File?>? _future;
+  Timer? _retryTimer;
+  int _retries = 0;
 
   @override
   void initState() {
     super.initState();
     _future = _resolve();
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -46,6 +56,7 @@ class _UserAvatarState extends State<UserAvatar> {
     final missing = path != null &&
         path.isNotEmpty &&
         AvatarService.cachedFile(path) == null;
+    if (changed) _retries = 0;
     if (changed || missing) {
       _future = _resolve();
     }
@@ -53,8 +64,25 @@ class _UserAvatarState extends State<UserAvatar> {
 
   Future<File?>? _resolve() {
     final path = widget.avatarPath;
+    debugPrint('UserAvatar(${widget.name}): avatarPath=$path');
     if (path == null || path.isEmpty) return null;
-    return AvatarService.localFileFor(path);
+    return AvatarService.localFileFor(path).then((file) {
+      debugPrint('UserAvatar(${widget.name}): file=${file?.path}');
+      if (file == null) _scheduleRetry();
+      return file;
+    });
+  }
+
+  void _scheduleRetry() {
+    if (_retries >= 2 || !mounted) return;
+    _retries++;
+    _retryTimer?.cancel();
+    _retryTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _future = _resolve();
+      });
+    });
   }
 
   String _initial() {
@@ -87,14 +115,34 @@ class _UserAvatarState extends State<UserAvatar> {
     );
   }
 
+  Widget _photo(File file) {
+    return ClipOval(
+      child: Image.file(
+        file,
+        width: widget.size,
+        height: widget.size,
+        fit: BoxFit.cover,
+        cacheWidth: (widget.size * 3).round(),
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stack) {
+          debugPrint('UserAvatar: could not draw the photo: $error');
+          return _initialCircle();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final path = widget.avatarPath;
-    final future = _future;
+    if (path == null || path.isEmpty) return _initialCircle();
 
-    if (path == null || path.isEmpty || future == null) {
-      return _initialCircle();
-    }
+    // Photo already stored on this phone: draw it right away.
+    final local = AvatarService.fileSync(path);
+    if (local != null) return _photo(local);
+
+    final future = _future;
+    if (future == null) return _initialCircle();
 
     return FutureBuilder<File?>(
       future: future,
@@ -102,18 +150,7 @@ class _UserAvatarState extends State<UserAvatar> {
       builder: (context, snapshot) {
         final file = snapshot.data;
         if (file == null) return _initialCircle();
-
-        return ClipOval(
-          child: Image.file(
-            file,
-            width: widget.size,
-            height: widget.size,
-            fit: BoxFit.cover,
-            cacheWidth: (widget.size * 3).round(),
-            gaplessPlayback: true,
-            errorBuilder: (context, error, stack) => _initialCircle(),
-          ),
-        );
+        return _photo(file);
       },
     );
   }

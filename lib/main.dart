@@ -9,6 +9,7 @@ import 'features/auth/auth_service.dart';
 import 'services/notification_service.dart';
 import 'gamification/gamification_hooks.dart';
 import 'services/sync_service.dart';
+import 'services/avatar_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,5 +55,6 @@ void main() async {
   // V2 Step 13: gives XP to existing sessions and tasks the first time,
   // then keeps the ledger in line with the data. Runs in the background.
   GamificationHooks.startupRebuild();
+  await AvatarService.init();
   runApp(const StudyArchitectApp());
 }

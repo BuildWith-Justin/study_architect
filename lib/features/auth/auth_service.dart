@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart' show LaunchMode;
 
+import 'offline_access.dart';
+
 /// Thin wrapper around Supabase Auth so no screen talks to Supabase directly.
 class AuthService {
   AuthService._();
@@ -138,6 +140,9 @@ class AuthService {
 
   Future<void> signOut() async {
     passwordPromptDismissed = false;
+    // Remember that this sign-out was the user's choice, so the app does
+    // not treat them as "offline" and skip the sign-in screen.
+    await OfflineAccess.markSignedOut();
     await _client.auth.signOut();
   }
 

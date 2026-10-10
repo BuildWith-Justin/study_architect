@@ -38,6 +38,39 @@ class AvatarService {
 
   static SupabaseClient get _client => Supabase.instance.client;
 
+  static Directory? _baseDir;
+
+  /// Call once at startup so photos stored on the phone can be found
+  /// instantly (no await) when a screen is drawn.
+  static Future<void> init() async {
+    try {
+      _baseDir = await getApplicationSupportDirectory();
+    } catch (e) {
+      debugPrint('Avatar init failed: $e');
+    }
+  }
+
+  /// The photo file if it is already stored on this phone, found without
+  /// any await. Returns null when it is not there yet.
+  static File? fileSync(String storagePath) {
+    final memo = _memo[storagePath];
+    if (memo != null) return memo;
+
+    final base = _baseDir;
+    if (base == null) return null;
+
+    final file = File(
+      p.join(base.path, 'avatars', storagePath.replaceAll('/', '_')),
+    );
+    try {
+      if (file.existsSync() && file.lengthSync() > 0) {
+        _memo[storagePath] = file;
+        return file;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // ------------------------------------------------------------------ public
 
   /// Opens the picker, uploads the photo and saves it on the student.
@@ -121,13 +154,9 @@ class AvatarService {
     final memo = _memo[storagePath];
     if (memo != null) return Future.value(memo);
 
-    // Do not hammer the network: after a failed download wait 30 s.
-    final failed = _failedAt[storagePath];
-    if (failed != null &&
-        DateTime.now().difference(failed) < const Duration(seconds: 30)) {
-      return Future.value(null);
-    }
-
+    // A failed download only pauses the NETWORK (see _resolve). The copy
+    // already stored on this phone is always checked, so an earlier failed
+    // attempt can never hide a photo that is on the device.
     return _inFlight[storagePath] ??=
         _resolve(storagePath).whenComplete(() => _inFlight.remove(storagePath));
   }
@@ -201,12 +230,21 @@ class AvatarService {
   static Future<File?> _resolve(String storagePath) async {
     try {
       final file = await _cacheFile(storagePath);
+      debugPrint('Avatar: cache ${file.path} exists=${await file.exists()}');
       if (await file.exists() && await file.length() > 0) {
         _memo[storagePath] = file;
         return file;
       }
 
       if (!AuthService.isAvailable || _client.auth.currentUser == null) {
+        debugPrint('Avatar: photo not on this phone and not signed in yet.');
+        return null;
+      }
+
+      // Only the download waits after a failure (30 s).
+      final failed = _failedAt[storagePath];
+      if (failed != null &&
+          DateTime.now().difference(failed) < const Duration(seconds: 30)) {
         return null;
       }
 

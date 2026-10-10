@@ -202,6 +202,7 @@ class _MoreScreenState extends State<MoreScreen>
       onRetry: _reload,
       builder: (context, data) {
         final student = data.student;
+        debugPrint('More: avatarPath=${student.avatarPath}');
 
         final notificationsEnabled =
             _notificationOverride ?? data.settings.notificationsEnabled;
