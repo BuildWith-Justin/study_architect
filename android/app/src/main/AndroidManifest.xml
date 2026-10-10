@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
 
     <application
-        android:label="study_architect"
+        android:label="Study Architect"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
