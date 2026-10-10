@@ -192,6 +192,11 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                           decoration: _fieldDecoration(),
                           style: const TextStyle(
                               color: AppColors.textPrimary, fontSize: 15),
+                          dropdownColor: AppColors.surfaceLightAlt,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: AppColors.textSecondary,
+                          ),
                           items: _subjects
                               .map((s) => DropdownMenuItem(
                                   value: s.id, child: Text(s.name)))
@@ -209,6 +214,11 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                           decoration: _fieldDecoration(),
                           style: const TextStyle(
                               color: AppColors.textPrimary, fontSize: 15),
+                          dropdownColor: AppColors.surfaceLightAlt,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: AppColors.textSecondary,
+                          ),
                           items: [
                             const DropdownMenuItem(
                                 value: null, child: Text('None')),
@@ -226,6 +236,11 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                         decoration: _fieldDecoration(),
                         style: const TextStyle(
                             color: AppColors.textPrimary, fontSize: 15),
+                        dropdownColor: AppColors.surfaceLightAlt,
+                        icon: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: AppColors.textSecondary,
+                        ),
                         items: TaskType.values
                             .map((t) => DropdownMenuItem(
                                 value: t, child: Text(_typeLabel(t))))

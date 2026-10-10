@@ -39,11 +39,19 @@ class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
   bool _saving = false;
   String? _error;
 
-  static const _colorOptions = [
-    AppColors.accentPurpleStrong,
-    AppColors.accentBlueStrong,
-    AppColors.accentGreenStrong,
+  // Same 6 colours as the first-time setup (onboarding) screen.
+  static const _paletteColors = <Color>[
+    Color(0xFF4C8DF6), // blue
+    Color(0xFF1FB57F), // green
+    Color(0xFFF59E0B), // orange
+    Color(0xFFEC4899), // pink
+    Color(0xFFEF4444), // red
+    Color(0xFFA78BFA), // lavender
   ];
+
+  // The palette, plus this subject's current colour when it is an older
+  // colour no longer in the palette (so it stays selectable).
+  late final List<Color> _colorOptions;
 
   bool get _isEditing => widget.existing != null;
 
@@ -64,7 +72,12 @@ class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
 
     _color = existing != null
         ? Color(existing.colorValue)
-        : AppColors.accentPurpleStrong;
+        : _paletteColors.first;
+
+    _colorOptions = [..._paletteColors];
+    if (!_colorOptions.any((c) => c.toARGB32() == _color.toARGB32())) {
+      _colorOptions.insert(0, _color);
+    }
   }
 
   @override
