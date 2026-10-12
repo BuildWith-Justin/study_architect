@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_helpers.dart';
 import 'pastel_card.dart';
 
 /// One event row on the Timetable screen: colored dot + connecting
@@ -65,7 +66,7 @@ class TimelineEventCard extends StatelessWidget {
                   Text(
                     timeRange,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
+                          color: context.secondaryText,
                         ),
                   ),
                   const SizedBox(height: 6),
@@ -78,10 +79,10 @@ class TimelineEventCard extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
+                            color: context.primaryText,
                           ),
                         ),
                         const SizedBox(height: 2),

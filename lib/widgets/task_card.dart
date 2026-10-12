@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import '../theme/theme_helpers.dart';
 import 'pastel_card.dart';
 
 /// A single task tile, e.g. Home's "Computer networks / Laboratory
@@ -42,10 +42,10 @@ class TaskCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
+              color: context.primaryText,
               decoration: TextDecoration.none,
             ),
           ),

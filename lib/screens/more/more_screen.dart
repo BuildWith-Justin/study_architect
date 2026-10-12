@@ -26,6 +26,19 @@ import 'edit_goals_screen.dart';
 import 'edit_profile_screen.dart';
 import 'more_view_data.dart';
 
+/// "Level 300 • Computer Engineering". The level is saved as "Level 300"
+/// (or just "300" when typed by hand), so "Level" is only added if missing.
+String _profileSubtitle(String level, String program) {
+  final lvl = level.trim();
+  final prog = program.trim();
+  final levelText = lvl.isEmpty
+      ? ''
+      : (lvl.toLowerCase().startsWith('level') ? lvl : 'Level $lvl');
+  if (levelText.isEmpty) return prog;
+  if (prog.isEmpty) return levelText;
+  return '$levelText • $prog';
+}
+
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
 
@@ -267,7 +280,7 @@ class _MoreScreenState extends State<MoreScreen>
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Level ${student.level} • ${student.program}',
+                            _profileSubtitle(student.level, student.program),
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,

@@ -71,7 +71,9 @@ class _TimetableScreenState extends State<TimetableScreen>
   Future<void> onRefresh() async {
     if (!mounted) return;
     final next = _load();
-    setState(() => _future = next);
+    setState(() {
+      _future = next;
+    });
     try {
       await next;
     } catch (_) {

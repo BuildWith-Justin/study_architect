@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_helpers.dart';
 import 'pastel_card.dart';
 
 /// Subject row on the Subjects screen: initial badge, name, topic
@@ -44,10 +45,10 @@ class SubjectCard extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    color: context.primaryText,
                   ),
                 ),
                 const SizedBox(height: 2),

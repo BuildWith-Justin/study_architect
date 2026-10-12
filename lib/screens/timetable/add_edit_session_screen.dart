@@ -633,6 +633,11 @@ class _AddEditSessionScreenState extends State<AddEditSessionScreen> {
                             color: AppColors.textPrimary,
                             fontSize: 15,
                           ),
+                          dropdownColor: AppColors.surfaceLightAlt,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: AppColors.textSecondary,
+                          ),
                           items: _subjects
                               .map(
                                 (s) => DropdownMenuItem(
@@ -666,6 +671,11 @@ class _AddEditSessionScreenState extends State<AddEditSessionScreen> {
                           style: const TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 15,
+                          ),
+                          dropdownColor: AppColors.surfaceLightAlt,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: AppColors.textSecondary,
                           ),
                           items: [
                             const DropdownMenuItem(
