@@ -382,7 +382,8 @@ class _HomeScreenState extends State<HomeScreen>
       return PastelHue.blue;
     }
 
-    return PastelHue.purple;
+    return pastelHueForColor(color);
+
   }
 }
 

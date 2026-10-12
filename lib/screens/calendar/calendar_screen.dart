@@ -179,7 +179,8 @@ class _CalendarScreenState extends State<CalendarScreen>
   PastelHue _hueFor(int colorValue) {
     if (colorValue == AppColors.accentGreenStrong.value) return PastelHue.green;
     if (colorValue == AppColors.accentBlueStrong.value) return PastelHue.blue;
-    return PastelHue.purple;
+    return pastelHueForColor(colorValue);
+
   }
 
   Color _heatColor(int level) {

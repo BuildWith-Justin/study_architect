@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// The three tinted hues used across Home tasks, class cards, and
-/// Timetable events.
-enum PastelHue { blue, purple, green }
+/// The tinted hues used across Home tasks, class cards, Subjects and
+/// Timetable events. blue / purple / green are the original three;
+/// orange, pink and red match the extra subject colours.
+enum PastelHue { blue, purple, green, orange, pink, red }
 
 Color pastelBackground(PastelHue hue) {
   switch (hue) {
@@ -13,6 +14,12 @@ Color pastelBackground(PastelHue hue) {
       return AppColors.accentPurple;
     case PastelHue.green:
       return AppColors.accentGreen;
+    case PastelHue.orange:
+      return const Color(0xFFFFEFD2);
+    case PastelHue.pink:
+      return const Color(0xFFFCE4F0);
+    case PastelHue.red:
+      return const Color(0xFFFDE2E2);
   }
 }
 
@@ -24,6 +31,34 @@ Color pastelStrong(PastelHue hue) {
       return AppColors.accentPurpleStrong;
     case PastelHue.green:
       return AppColors.accentGreenStrong;
+    case PastelHue.orange:
+      // Slightly deeper than the swatch so text stays readable on the card.
+      return const Color(0xFFD97706);
+    case PastelHue.pink:
+      return const Color(0xFFEC4899);
+    case PastelHue.red:
+      return const Color(0xFFEF4444);
+  }
+}
+
+/// Picks the card hue for a subject's saved colour. Unknown / older
+/// colours (including the old purple) fall back to purple.
+PastelHue pastelHueForColor(int colorValue) {
+  if (colorValue == AppColors.accentBlueStrong.toARGB32()) {
+    return PastelHue.blue;
+  }
+  if (colorValue == AppColors.accentGreenStrong.toARGB32()) {
+    return PastelHue.green;
+  }
+  switch (colorValue) {
+    case 0xFFF59E0B:
+      return PastelHue.orange;
+    case 0xFFEC4899:
+      return PastelHue.pink;
+    case 0xFFEF4444:
+      return PastelHue.red;
+    default:
+      return PastelHue.purple;
   }
 }
 

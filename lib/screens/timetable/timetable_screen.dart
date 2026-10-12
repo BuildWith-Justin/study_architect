@@ -104,7 +104,8 @@ class _TimetableScreenState extends State<TimetableScreen>
   PastelHue _hueFor(int colorValue) {
     if (colorValue == AppColors.accentGreenStrong.value) return PastelHue.green;
     if (colorValue == AppColors.accentBlueStrong.value) return PastelHue.blue;
-    return PastelHue.purple;
+    return pastelHueForColor(colorValue);
+
   }
 
   /// True when the week on screen has at least one session on [day].
