@@ -27,7 +27,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     'Level 300',
     'Level 400',
     'Postgraduate',
-    'Other',
   ];
 
   final _nameController = TextEditingController();

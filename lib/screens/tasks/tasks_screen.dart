@@ -26,9 +26,9 @@ class _TasksScreenState extends State<TasksScreen>
 
   @override
   List<RefreshScope> get watchedScopes => [
-      RefreshScope.tasks,
-      RefreshScope.subjects,
-    ];
+        RefreshScope.tasks,
+        RefreshScope.subjects,
+      ];
 
   @override
   Future<void> onRefresh() => _reload();

@@ -7,6 +7,7 @@ import '../../repositories/student_repository.dart';
 import '../../core/data_refresh_bus.dart';
 import '../../services/avatar_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/education_levels.dart';
 import '../../widgets/app_buttons.dart';
 import '../../widgets/gradient_background.dart';
 import '../../widgets/user_avatar.dart';
@@ -24,9 +25,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _schoolController;
   late final TextEditingController _programController;
-  late final TextEditingController _levelController;
   final _repo = StudentRepository();
   bool _saving = false;
+
+  // The level can only be picked from EducationLevels.options.
+  String? _level;
 
   // V2 Step 15: profile photo.
   String? _avatarPath;
@@ -39,7 +42,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController = TextEditingController(text: widget.student.name);
     _schoolController = TextEditingController(text: widget.student.school);
     _programController = TextEditingController(text: widget.student.program);
-    _levelController = TextEditingController(text: widget.student.level);
+    _level = EducationLevels.normalize(widget.student.level);
     _avatarPath = widget.student.avatarPath;
   }
 
@@ -48,7 +51,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _schoolController.dispose();
     _programController.dispose();
-    _levelController.dispose();
     super.dispose();
   }
 
@@ -60,7 +62,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       name: _nameController.text.trim(),
       school: _schoolController.text.trim(),
       program: _programController.text.trim(),
-      level: _levelController.text.trim(),
+      // If an old, unrecognised level was never changed, it is kept as is.
+      level: _level ?? widget.student.level,
     );
     await _repo.update(updated);
     DataRefreshBus.instance.notify(RefreshScope.all);
@@ -92,8 +95,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) _showMessage(e.message);
     } catch (e) {
       debugPrint('Photo pick failed: $e');
-      if (mounted)
+      if (mounted) {
         _showMessage('Could not change the photo. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _photoBusy = false);
     }
@@ -114,8 +118,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) _showMessage(e.message);
     } catch (e) {
       debugPrint('Photo remove failed: $e');
-      if (mounted)
+      if (mounted) {
         _showMessage('Could not remove the photo. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _photoBusy = false);
     }
@@ -257,7 +262,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         const SizedBox(height: AppSpacing.lg),
                         _field('Program', _programController),
                         const SizedBox(height: AppSpacing.lg),
-                        _field('Level', _levelController),
+                        _levelField(),
                       ],
                     ),
                   ),
@@ -274,6 +279,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _levelField() {
+    final saved = widget.student.level.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Level',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          initialValue: _level,
+          isExpanded: true,
+          dropdownColor: AppColors.surfaceLightAlt,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 16,
+          ),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppColors.textSecondary,
+          ),
+          hint: Text(
+            saved.isEmpty ? 'Select your level' : saved,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.surfaceLight,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadii.control),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          items: [
+            for (final l in EducationLevels.options)
+              DropdownMenuItem(value: l, child: Text(l)),
+          ],
+          onChanged: (value) => setState(() => _level = value),
+        ),
+      ],
     );
   }
 

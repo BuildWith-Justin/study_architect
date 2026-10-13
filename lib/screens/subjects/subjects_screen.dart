@@ -64,10 +64,10 @@ class _SubjectsScreenState extends State<SubjectsScreen>
 
   @override
   List<RefreshScope> get watchedScopes => [
-      RefreshScope.subjects,
-      RefreshScope.sessions,
-      RefreshScope.tasks,
-    ];
+        RefreshScope.subjects,
+        RefreshScope.sessions,
+        RefreshScope.tasks,
+      ];
 
   Future<void> _openAdd() async {
     await Navigator.of(context).push<bool>(

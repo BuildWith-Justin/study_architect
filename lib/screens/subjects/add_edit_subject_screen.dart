@@ -70,9 +70,8 @@ class _AddEditSubjectScreenState extends State<AddEditSubjectScreen> {
     _weeklyTargetHours =
         ((existing?.weeklyTargetMinutes ?? 360) / 60).toDouble();
 
-    _color = existing != null
-        ? Color(existing.colorValue)
-        : _paletteColors.first;
+    _color =
+        existing != null ? Color(existing.colorValue) : _paletteColors.first;
 
     _colorOptions = [..._paletteColors];
     if (!_colorOptions.any((c) => c.toARGB32() == _color.toARGB32())) {

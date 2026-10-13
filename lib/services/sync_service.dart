@@ -29,7 +29,7 @@ const _tables = [
   _SyncTable('xp_log'),
 ];
 
-/// UTC ISO-8601 with millisecond precision — the same shape SQLite writes,
+/// UTC ISO-8601 with millisecond precision - the same shape SQLite writes,
 /// so plain string comparison orders timestamps correctly.
 String _iso(DateTime d) => DateTime.fromMillisecondsSinceEpoch(
       d.millisecondsSinceEpoch,
@@ -46,6 +46,9 @@ class SyncService {
 
   bool _running = false;
   bool _runAgain = false;
+
+  /// While true, no sync starts (used by "Clear all data").
+  bool _paused = false;
   Timer? _debounce;
   Timer? _poller;
   RealtimeChannel? _channel;
@@ -83,8 +86,27 @@ class SyncService {
     _unsubscribeRealtime();
   }
 
+  /// Stops new syncs and waits (up to 30 s) for a running one to finish.
+  Future<void> pauseAndWaitIdle() async {
+    _paused = true;
+    _runAgain = false;
+    _debounce?.cancel();
+    final deadline = DateTime.now().add(const Duration(seconds: 30));
+    while (_running && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+  }
+
+  /// Lets syncing start again and schedules a sync.
+  void resume() {
+    _paused = false;
+    _runAgain = false;
+    scheduleSync();
+  }
+
   /// Debounced: many quick calls collapse into one sync.
   void scheduleSync() {
+    if (_paused) return;
     _debounce?.cancel();
     _debounce = Timer(const Duration(seconds: 2), syncNow);
   }
@@ -92,6 +114,7 @@ class SyncService {
   Future<void> syncNow() async {
     final user = _client.auth.currentUser;
     if (user == null) return;
+    if (_paused) return;
     if (_running) {
       _runAgain = true;
       return;

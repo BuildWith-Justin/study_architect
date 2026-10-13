@@ -383,7 +383,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     return pastelHueForColor(color);
-
   }
 }
 

@@ -46,8 +46,7 @@ class OfflineAccess {
   static Future<bool> canUseWithoutSession() async {
     try {
       final db = await DatabaseService.instance.database;
-      final students =
-          await db.query('students', columns: ['id'], limit: 1);
+      final students = await db.query('students', columns: ['id'], limit: 1);
       if (students.isEmpty) return false;
 
       final flag = await db.query(

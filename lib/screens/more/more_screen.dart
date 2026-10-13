@@ -54,8 +54,8 @@ class _MoreScreenState extends State<MoreScreen>
 
   @override
   List<RefreshScope> get watchedScopes => [
-      RefreshScope.achievements,
-    ];
+        RefreshScope.achievements,
+      ];
 
   @override
   Future<void> onRefresh() => _reload();

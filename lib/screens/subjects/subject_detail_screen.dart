@@ -114,11 +114,11 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   @override
   List<RefreshScope> get watchedScopes => [
-      RefreshScope.subjects,
-      RefreshScope.sessions,
-      RefreshScope.tasks,
-      RefreshScope.exams,
-    ];
+        RefreshScope.subjects,
+        RefreshScope.sessions,
+        RefreshScope.tasks,
+        RefreshScope.exams,
+      ];
 
   /// Tells the other screens (for example the Subjects list underneath
   /// this one) that subject or topic data changed.

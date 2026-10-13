@@ -10,7 +10,7 @@ import '../../gamification/gamification_hooks.dart';
 import '../../core/data_refresh_bus.dart';
 import '../../services/app_prefs.dart';
 import '../../services/backup_service.dart';
-import '../../services/database_service.dart';
+import '../../services/account_reset_service.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_helpers.dart';
@@ -188,7 +188,7 @@ class _BackupScreenState extends State<BackupScreen> {
 
     setState(() => _busy = true);
     try {
-      await DatabaseService.instance.clearAllData();
+      await AccountResetService.instance.wipeEverything();
       await _resetReminders();
 
       _snack('All data has been cleared.');
@@ -366,7 +366,7 @@ class _BackupScreenState extends State<BackupScreen> {
                             icon: Icons.delete_forever_rounded,
                             title: 'Clear all data',
                             subtitle: 'Permanently remove all Study '
-                                'Architect data from this device',
+                                'Architect data from this device and your account',
                             danger: true,
                             onTap: _busy ? null : _clearAll,
                           ),
@@ -589,8 +589,8 @@ class _ClearDialogState extends State<_ClearDialog> {
         children: [
           const Text(
             'This permanently deletes all Study Architect data on this '
-            'device. If you are signed in, the deletion can also reach '
-            'your account on the next sync.',
+            'device. If you are signed in, it is also deleted from '
+            'your account. You stay signed in and start a new profile.',
           ),
           const SizedBox(height: 12),
           TextField(
