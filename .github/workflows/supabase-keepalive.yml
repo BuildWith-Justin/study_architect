@@ -10,6 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          curl -f -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
-          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "ERROR: SUPABASE_URL or SUPABASE_ANON_KEY secret is missing or empty"
+            exit 1
+          fi
+          BASE="${SUPABASE_URL%/}"
+          STATUS=$(curl -s -o response.txt -w "%{http_code}" \
+            "$BASE/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY")
+          echo "HTTP status: $STATUS"
+          cat response.txt
+          echo ""
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            echo "Ping OK"
+          else
+            echo "Ping FAILED"
+            exit 1
+          fi
