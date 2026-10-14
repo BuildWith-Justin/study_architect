@@ -58,7 +58,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       } else {
         // Email confirmation is ON: user must confirm via the email link first.
         setState(() => _info =
-            'Account created! Check your inbox to confirm your email, then sign in.');
+            'Account created! Tap Sign In below and use the same email and '
+            'password. If you are asked to confirm your email, check your inbox first.');
       }
     } catch (e) {
       if (mounted) setState(() => _error = AuthService.friendlyError(e));

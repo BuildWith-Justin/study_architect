@@ -52,3 +52,5 @@ android/build/
 .env 
 
 *.bak
+
+.env

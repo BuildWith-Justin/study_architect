@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
 import 'offline_access.dart';
+import 'local_owner_guard.dart';
 import 'password_prompt_gate.dart';
 import 'set_password_screen.dart';
 import 'sign_in_screen.dart';
@@ -132,7 +133,7 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
         return PasswordPromptGate(
-          child: widget.signedInBuilder(context),
+          child: LocalOwnerGuard(userId: session.user.id, child: widget.signedInBuilder(context)),
         );
       },
     );
