@@ -54,3 +54,6 @@ android/build/
 *.bak
 
 .env
+
+# Temporary code dumps
+dump_*.txt

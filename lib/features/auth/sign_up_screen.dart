@@ -102,7 +102,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         // Not signed in (for example email confirmation is required).
         setState(() => _info =
             'Account created! Tap Sign In below and use the same email and '
-            'password. If you are asked to confirm your email, check your inbox first.');
+                'password. If you are asked to confirm your email, check your inbox first.');
       }
     } catch (e) {
       if (mounted) setState(() => _error = AuthService.friendlyError(e));
@@ -122,7 +122,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (mounted) {
         setState(() => _info =
             'After you choose your Google account, come back to the app and '
-            'tap Sign In below.');
+                'tap Sign In below.');
       }
     } catch (e) {
       if (mounted) setState(() => _error = AuthService.friendlyError(e));

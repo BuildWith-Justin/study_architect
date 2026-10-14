@@ -133,7 +133,8 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
         return PasswordPromptGate(
-          child: LocalOwnerGuard(userId: session.user.id, child: widget.signedInBuilder(context)),
+          child: LocalOwnerGuard(
+              userId: session.user.id, child: widget.signedInBuilder(context)),
         );
       },
     );
