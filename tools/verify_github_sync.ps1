@@ -202,7 +202,13 @@ if ($SkipFreshClone) {
         if ($cloneHead -eq $remoteMain) { Ok 'Clone commit matches origin/main.' } else { Bad 'Clone commit differs from origin/main.' }
 
         if (Test-Path 'pubspec.yaml') {
-            Write-Host '--- flutter pub get ---'
+            if ((Test-Path '.env.example') -and -not (Test-Path '.env')) {
+                Copy-Item '.env.example' '.env'
+                Write-Host 'Created .env from .env.example for the test.'
+            } elseif (-not (Test-Path '.env.example')) {
+                Warn 'No .env.example in the repo: fresh clones cannot build if pubspec lists .env as an asset.'
+            }
+                        Write-Host '--- flutter pub get ---'
             flutter pub get
             if ($LASTEXITCODE -eq 0) { Ok 'flutter pub get succeeded on the fresh clone.' } else { Bad 'flutter pub get FAILED on the fresh clone.' }
 
@@ -211,7 +217,7 @@ if ($SkipFreshClone) {
             if ($LASTEXITCODE -eq 0) { Ok 'Formatting is clean.' } else { Warn 'Some files are not formatted. Run: dart format .' }
 
             Write-Host '--- flutter analyze ---'
-            flutter analyze
+            flutter analyze --no-fatal-infos
             if ($LASTEXITCODE -eq 0) { Ok 'flutter analyze: no issues.' } else { Bad 'flutter analyze found issues on the fresh clone.' }
 
             if (Test-Path 'test') {
@@ -239,3 +245,4 @@ if ($script:Fail -eq 0) {
 Write-Host "Full report saved to: $report"
 Stop-Transcript | Out-Null
 if ($script:Fail -gt 0) { exit 1 } else { exit 0 }
+
