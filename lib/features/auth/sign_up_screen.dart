@@ -38,6 +38,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return ok ? null : 'Enter a valid email';
   }
 
+  /// Sign-up returned no session. Try signing in with the same details so
+  /// the new user does not have to do it by hand. Returns true when it
+  /// worked; false when confirmation is required or anything else failed.
+  Future<bool> _trySignInAfterSignUp() async {
+    try {
+      final res = await AuthService.instance.signInWithEmail(
+        email: _emailCtrl.text,
+        password: _passwordCtrl.text,
+      );
+      return res.session != null;
+    } catch (e) {
+      debugPrint('Auto sign-in after sign-up skipped: $e');
+      return false;
+    }
+  }
+
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -52,11 +68,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
         password: _passwordCtrl.text,
       );
       if (!mounted) return;
-      if (res.session != null) {
-        // Email confirmation is OFF: user is signed in, AuthGate takes over.
+
+      var signedIn = res.session != null;
+      if (!signedIn) {
+        signedIn = await _trySignInAfterSignUp();
+        if (!mounted) return;
+      }
+
+      if (signedIn) {
+        // The user is signed in, AuthGate takes over and shows profile setup.
         Navigator.of(context).popUntil((r) => r.isFirst);
       } else {
-        // Email confirmation is ON: user must confirm via the email link first.
+        // Not signed in (for example email confirmation is required).
         setState(() => _info =
             'Account created! Tap Sign In below and use the same email and '
             'password. If you are asked to confirm your email, check your inbox first.');
