@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
 import 'auth_widgets.dart';
@@ -21,9 +24,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscure = true;
   String? _error;
   String? _info;
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // A Google sign-in finishes later, when the browser sends the person
+    // back to the app. As soon as any sign-in appears, close this screen
+    // so AuthGate can show the app (profile setup for new people).
+    if (AuthService.isAvailable) {
+      _authSub = AuthService.instance.authStateChanges.listen((state) {
+        if (state.session != null && mounted) {
+          Navigator.of(context).popUntil((r) => r.isFirst);
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
@@ -99,6 +119,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
     try {
       await AuthService.instance.signInWithGoogle();
+      if (mounted) {
+        setState(() => _info =
+            'After you choose your Google account, come back to the app and '
+            'tap Sign In below.');
+      }
     } catch (e) {
       if (mounted) setState(() => _error = AuthService.friendlyError(e));
     } finally {
