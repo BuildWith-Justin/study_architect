@@ -2,7 +2,7 @@
 
 **Study Architect** is a Flutter study planner and tracker that helps students organize their academic workload, plan study sessions, stay focused, and monitor their progress, with cloud sync so their data follows them across devices.
 
-This repository contains **Version 2 (V2)** of the project. The original local-only V1 is preserved under the `v1.0` tag.
+This repository contains **Version 2 (V2)** of the project. 
 
 ## ✨ Features
 
