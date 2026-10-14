@@ -1,90 +1,95 @@
 # Study Architect
 
-**Study Architect** is a local-first Flutter study planner and tracker designed to help students organize their academic workload, plan study sessions, track tasks, and monitor their study progress.
+**Study Architect** is a Flutter study planner and tracker that helps students organize their academic workload, plan study sessions, stay focused, and monitor their progress, with cloud sync so their data follows them across devices.
 
-This repository contains **Version 1 (V1)** of the project.
-
-> 🚧 Study Architect is an actively developing project. V1 focuses on establishing the core study-planning and tracking experience, with further improvements planned for future versions.
+This repository contains **Version 2 (V2)** of the project. The original local-only V1 is preserved under the `v1.0` tag.
 
 ## ✨ Features
 
-- 📅 **Study Timetable** — Create and manage planned study sessions.
-- 📚 **Subject Management** — Add and organize academic subjects.
-- ✅ **Task Management** — Create, edit, and track study-related tasks.
-- ⏱️ **Focus Timer** — Track focused study sessions.
-- 📊 **Progress Tracking** — View study activity and progress.
-- 🎯 **Daily Study Goals** — Set and monitor daily study targets.
-- 🔔 **Study Reminders** — Receive reminders for planned study activities and daily goals.
-- 👤 **Student Profile** — Store basic student information such as name, school, programme, and level.
-- 💾 **Local-First Storage** — Core data is stored locally on the device.
-- 📤 **Backup & Sharing** — Export/share supported study data for backup purposes.
+- 🔐 **Accounts & Sign-In** — Sign up with email and password or continue with Google.
+- 👤 **Onboarding & Student Profile** — Set up your name, school, programme, level, subjects, and daily study goal.
+- 📅 **Timetable** — Plan study sessions, including weekly recurring sessions.
+- ✅ **Tasks** — Create, edit, and complete study-related tasks.
+- 📚 **Subjects & Topics** — Organize subjects with ordered topics and follow a study roadmap.
+- ⏱️ **Focus Mode** — Distraction-free countdown ring, with a session-complete screen for mood and notes.
+- 📊 **Progress & Analytics** — Charts of your study time, plus a weekly report.
+- 🎯 **Daily Study Goals** — Set and track daily targets.
+- 📝 **Exam Mode** — Add exams with dates, topic checklists, countdowns, and preparation tracking.
+- 🗓️ **Calendar View** — Monthly calendar with a study-hours heatmap.
+- 🏆 **Gamification** — XP, levels, study streaks, and achievement badges.
+- 💡 **Smart Insights** — Personalized suggestions based on your study habits, plus natural-language quick add. These run on the device with no paid API.
+- 🖼️ **Profile Photos** — Upload a profile picture.
+- 🔔 **Notifications** — Reminders for planned sessions and daily goals.
+- 🌗 **Light & Dark Mode**
+- 💾 **Backup & Export** — Export your study data as a backup.
 
 ## 🛠️ Built With
 
-- **Flutter**
-- **Dart**
-- **SQLite**
+- **Flutter** and **Dart**
+- **Supabase** (Postgres, Auth, Storage)
+- **SQLite** (`sqflite`) for local storage
+- **fl_chart** for charts
+- **table_calendar** for the calendar view
 - **Flutter Local Notifications**
-- **Material Design**
+- **GitHub Actions** (scheduled keep-alive ping for the Supabase project)
 
 ## 🏗️ Architecture
 
-Study Architect V1 is built as a **local-first application**.
+Study Architect V2 is **offline-first with cloud sync**:
 
-The application currently stores its core data locally rather than relying on a cloud backend. This keeps the V1 experience simple and allows the application to function without requiring a user account or constant internet connection.
-
-Cloud functionality may be explored in future versions.
+- Data is stored locally in SQLite so the app stays usable without a connection.
+- A sync layer pushes and pulls changes to a Supabase Postgres database, secured with Row Level Security so each user only sees their own data.
+- Authentication is handled by Supabase Auth (email/password and Google).
+- A central refresh bus keeps screens up to date when data changes, and screens also support pull-to-refresh.
 
 ## 📱 Platform
 
-V1 is primarily developed with Flutter and is intended to support multiple platforms as the project develops.
-
-Some features, particularly device notifications, may depend on platform-specific support.
+V2 is developed and tested primarily on **Android**. It is built with Flutter, so other platforms may work, but they have not been fully tested.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-Make sure you have:
-
-- Flutter SDK installed
-- Dart SDK
-- Android Studio or another supported Flutter development environment
+- Flutter SDK and Dart SDK
+- Android Studio or another supported Flutter environment
 - Git
+- A free [Supabase](https://supabase.com) project
 
 ### Installation
 
 Clone the repository:
 
-```bash
-git clone https://github.com/BuildWith-Justin/study_architect.git
 ```
-
-Move into the project directory:
-
-```bash
+git clone https://github.com/BuildWith-Justin/study_architect.git
 cd study_architect
 ```
 
 Install dependencies:
 
-```bash
+```
 flutter pub get
 ```
 
-Run the application:
+Create your environment file by copying the example, then fill in your own Supabase values (see `.env.example` for the required keys):
 
-```bash
+```
+copy .env.example .env
+```
+
+Set up the database by running the SQL files in `supabase/migrations` in your Supabase project's SQL editor, in order.
+
+Run the app:
+
+```
 flutter run
 ```
 
 ## 📂 Project Structure
 
-The project follows a feature-oriented Flutter structure.
-
-```text
+```
 lib/
 ├── app/
+├── core/
 ├── data/
 ├── repositories/
 ├── screens/
@@ -92,39 +97,26 @@ lib/
 ├── theme/
 ├── utils/
 └── widgets/
+supabase/
+└── migrations/
+test/
 ```
-
-The exact structure may continue to evolve as the project develops.
 
 ## 🧪 Current Status
 
-**Version:** `0.1.0+1`  
-**Stage:** V1 — Initial MVP
+**Stage:** V2 complete. All planned V2 features are built and tested.
 
-V1 represents the first working foundation of Study Architect. The project is still being tested, refined, and improved.
+Known improvements for future versions:
 
-Known issues and future improvements will be addressed as development continues.
-
-## 🗺️ Future Development
-
-Potential areas for future versions include:
-
-- ☁️ Cloud synchronization
-- 🔐 User accounts and authentication
-- 📱 Improved cross-platform support
-- 📈 More advanced study analytics
-- 🔄 Smarter timetable restructuring
-- 🎨 Further UI/UX improvements
-- ⚡ Performance improvements
-- 🔔 Expanded notification functionality
+- Reminder notifications for exams
+- Additional sign-in methods
+- Further performance and UI polish
 
 ## 👨🏾‍💻 Developer
 
 **Justin Bill Ocloo**
 
-Computer Engineering student building Study Architect as part of his journey into software development.
-
-The project is being developed as a practical way to explore Flutter, Dart, local data storage, application architecture, Git, GitHub, and software product development.
+Computer Engineering student building Study Architect as part of his journey into software development, exploring Flutter, Dart, Supabase, application architecture, Git, and product design.
 
 ## 📄 License
 
