@@ -9,7 +9,7 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Ping Supabase (database write)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -20,8 +20,10 @@ jobs:
           fi
           BASE="${SUPABASE_URL%/}"
           STATUS=$(curl -s -o response.txt -w "%{http_code}" \
-            "$BASE/rest/v1/profiles?select=id&limit=1" \
-            -H "apikey: $SUPABASE_ANON_KEY")
+            -X POST "$BASE/rest/v1/rpc/keepalive_ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}')
           echo "HTTP status: $STATUS"
           cat response.txt
           echo ""
