@@ -2,14 +2,14 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '17 */4 * * *'
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase (database write)
+      - name: Ping Supabase (several database requests)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -19,15 +19,34 @@ jobs:
             exit 1
           fi
           BASE="${SUPABASE_URL%/}"
+          FAILED=0
+
+          for i in 1 2 3; do
+            STATUS=$(curl -s -o response.txt -w "%{http_code}" \
+              -X POST "$BASE/rest/v1/rpc/keepalive_ping" \
+              -H "apikey: $SUPABASE_ANON_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+            echo "write ping $i -> HTTP $STATUS"
+            if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+              FAILED=1
+              cat response.txt
+              echo ""
+            fi
+            sleep 3
+          done
+
           STATUS=$(curl -s -o response.txt -w "%{http_code}" \
-            -X POST "$BASE/rest/v1/rpc/keepalive_ping" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{}')
-          echo "HTTP status: $STATUS"
-          cat response.txt
-          echo ""
-          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            "$BASE/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY")
+          echo "read ping -> HTTP $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            FAILED=1
+            cat response.txt
+            echo ""
+          fi
+
+          if [ "$FAILED" -eq 0 ]; then
             echo "Ping OK"
           else
             echo "Ping FAILED"
